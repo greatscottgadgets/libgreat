@@ -1,0 +1,12 @@
+Here is an inevitably incomplete list of MUCH-APPRECIATED CONTRIBUTORS --
+people who have submitted patches, reported bugs, added translations, helped
+answer newbie questions, and generally made libgreat that much better:
+
+* Kate Temkin <k@ktemkin.com>
+* Mikaela Szekely <qyriad@gmail.com>
+* Dominic Spill <dominicgs@gmail.com>
+* Michael Ossmann <mike@ossmann.com>
+* Jacob Graves <jacob@greatscottgadgets.com>
+* Travis Goodspeed <travis@tnbelt.com>
+
+Many thanks in particular to [@Qyriad](https://github.com/Qyriad) for her help in developing the CMake library core for libgreat.
