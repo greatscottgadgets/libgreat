@@ -8,6 +8,9 @@ cmake_minimum_required(VERSION 3.1.3)
 
 project(libgreat C CXX ASM)
 
+# Horrible hack: use libopencm3, for now.
+include ("${CMAKE_CURRENT_SOURCE_DIR}/firmware/cmake/libopencm3.cmake")
+
 set(LD_SCRIPT "-T${CMAKE_CURRENT_SOURCE_DIR}/../firmware/common/LPC43xx_M4_memory.ld -Tlibopencm3_lpc43xx_rom_to_ram.ld -T${CMAKE_CURRENT_SOURCE_DIR}/..firmware/common/LPC43xx_M4_M0_image_from_text.ld")
 
 set(LD_SCRIPT_DFU "-T${CMAKE_CURRENT_SOURCE_DIR}/../firmware/common/LPC4330_M4.memory.ld -Tlibopencm3_lpc43xx.ld -T${CMAKE_CURRENT_SOURCE_DIR}/../firmware/common/LPC43xx_M4_M0_image_from_text.ld")
@@ -39,6 +42,7 @@ add_library(libgreat OBJECT
 	)
 
 target_compile_definitions(libgreat PUBLIC ${DEFINES_COMMON})
+add_dependencies(libgreat libopencm3_${PROJECT_NAME})
 
 target_include_directories(libgreat SYSTEM PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../firmware/libopencm3/include)
 target_include_directories(libgreat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/firmware/include ${CMAKE_CURRENT_SOURCE_DIR}/firmware/include/platform/lpc43xx ${CMAKE_CURRENT_SOURCE_DIR}/../firmware/common)
