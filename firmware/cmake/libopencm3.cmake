@@ -2,6 +2,7 @@
 # This file is part of GreatFET.
 # Legacy support stub for libopencm3. It will be removed as soon as we can. :)
 #
+include_guard(GLOBAL)
 
 include(ExternalProject)
 
@@ -10,8 +11,7 @@ include(ExternalProject)
 set(PATH_LIBOPENCM3 ${PATH_GREATFET_FIRMWARE}/libopencm3)
 
 # Actually build libopencm3.
-message(STATUS "Ensuring libopencm3 has been built.")
-ExternalProject_Add(libopencm3_${PROJECT_NAME}
+ExternalProject_Add(libopencm3
 	SOURCE_DIR "${PATH_LIBOPENCM3}"
 	BUILD_IN_SOURCE true
 	DOWNLOAD_COMMAND ""
