@@ -117,6 +117,7 @@ endfunction(add_libgreat_library)
 
 #
 # Function that creates a new libgreat library / source collection iff the relevant library does not exist.
+
 # Arguments: <library_name> [sources...]
 #
 function(add_libgreat_library_if_necessary LIBRARY_NAME)
@@ -134,7 +135,11 @@ endfunction(add_libgreat_library_if_necessary)
 # Arguments: <module_name> [sources...]
 #
 function(define_libgreat_module MODULE_NAME)
-    add_libgreat_library_if_necessary(libgreat_module_${MODULE_NAME} ${ARGN})
+	add_libgreat_library_if_necessary(libgreat_module_${MODULE_NAME} ${ARGN})
+
+	# FIXME: don't have everything depend on libopencm3
+	add_dependencies(libgreat_module_${MODULE_NAME} libopencm3)
+
 endfunction(define_libgreat_module)
 
 
