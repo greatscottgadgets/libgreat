@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <toolchain.h>
 
 #include <drivers/usb/lpc43xx/usb.h>
 #include <drivers/usb/lpc43xx/usb_host.h>
@@ -20,6 +21,8 @@
 #include <libopencm3/lpc43xx/scu.h>
 
 // FIXME: Clean me up to use the USB_REG macro from usb_registers.h to reduce duplication!
+
+usb_peripheral_t WEAK usb_peripherals[] = {{ .controller = 0, }, { .controller = 1, }};
 
 #define USB_QH_INDEX(endpoint_address) (((endpoint_address & 0xF) * 2) + ((endpoint_address >> 7) & 1))
 
