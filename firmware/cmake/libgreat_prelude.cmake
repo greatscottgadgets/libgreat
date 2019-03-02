@@ -4,8 +4,6 @@
 #
 # Should be included before the main project() call.
 #
-include_guard()
-
 
 # If we don't have a platform configuration, this can't be right.
 if (NOT LIBGREAT_PLATFORM)

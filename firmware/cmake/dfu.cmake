@@ -17,9 +17,8 @@ function(add_dfu_executable NEW_EXECUTABLE BASE_EXECUTABLE BASE_LINKER_SCRIPT DF
     string(REPLACE "${BASE_LINKER_SCRIPT}" "${DFU_LINKER_SCRIPT}" DFU_LINK_OPTIONS "${LINK_OPTIONS}")
 
     # Create a new executable that will create the elf representation of the given target.
-    add_executable(${NEW_EXECUTABLE}.elf)
+    add_executable(${NEW_EXECUTABLE}.elf ${SOURCES})
     set_target_properties(${NEW_EXECUTABLE}.elf PROPERTIES
-        SOURCES          "${SOURCES}"
         LINK_OPTIONS     "${DFU_LINK_OPTIONS}"
         LINK_DIRECTORIES "${LINK_DIRECTORIES}"
         LINK_LIBRARIES   "${LINK_LIBRARIES}"
