@@ -22,3 +22,6 @@ set(PATH_LIBGREAT_FIRMWARE          ${PATH_LIBGREAT}/firmware)
 set(PATH_LIBGREAT_FIRMWARE_CMAKE    ${PATH_LIBGREAT_FIRMWARE}/cmake)
 set(PATH_LIBGREAT_FIRMWARE_DRIVERS  ${PATH_LIBGREAT_FIRMWARE}/drivers)
 set(PATH_LIBGREAT_FIRMWARE_PLATFORM ${PATH_LIBGREAT}/firmware/platform/${LIBGREAT_PLATFORM})
+
+# CMake compatibility for older CMake versions.
+include(${PATH_LIBGREAT_FIRMWARE_CMAKE}/compatibility.cmake)

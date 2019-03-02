@@ -84,7 +84,7 @@ function(add_flash_executable EXECUTABLE_NAME)
 		${PATH_LIBGREAT}/firmware/platform/${LIBGREAT_PLATFORM}/linker
 	)
 
-	target_link_libraries(${EXECUTABLE_NAME}.elf c nosys ${LINK_LIBRARIES_BOARD} m)
+	target_link_libraries(${EXECUTABLE_NAME}.elf PRIVATE c nosys ${LINK_LIBRARIES_BOARD} m)
 
 	# Add a target that creates the final binary.
 	add_custom_target(${EXECUTABLE_NAME} ALL DEPENDS ${EXECUTABLE_NAME}.elf COMMAND ${CMAKE_OBJCOPY} -Obinary ${EXECUTABLE_NAME}.elf ${EXECUTABLE_NAME})
