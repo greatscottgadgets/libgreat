@@ -5,11 +5,11 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include <drivers/usb/lpc43xx/usb_standard_request.h>
+#include <drivers/usb/usb_standard_request.h>
 
-#include <drivers/usb/lpc43xx/usb.h>
-#include <drivers/usb/lpc43xx/usb_type.h>
-#include <drivers/usb/lpc43xx/usb_queue.h>
+#include <drivers/usb/usb.h>
+#include <drivers/usb/usb_type.h>
+#include <drivers/usb/usb_queue.h>
 
 const uint8_t* usb_endpoint_descriptor(
 	const usb_endpoint_t* const endpoint
@@ -26,10 +26,10 @@ const uint8_t* usb_endpoint_descriptor(
 			descriptor += descriptor[0];
 		}
 	}
-	
+
 	return 0;
 }
-	
+
 uint_fast16_t usb_endpoint_descriptor_max_packet_size(
 	const uint8_t* const endpoint_descriptor
 ) {
@@ -57,7 +57,7 @@ bool usb_set_configuration(
 
 	const usb_configuration_t* new_configuration = 0;
 	if( configuration_number != 0 ) {
-		
+
 		// Locate requested configuration.
 		if( device->configurations ) {
 			usb_configuration_t** configurations = *(device->configurations);
@@ -78,7 +78,7 @@ bool usb_set_configuration(
 			return false;
 		}
 	}
-	
+
 	if( new_configuration != device->configuration ) {
 		// Configuration changed.
 		device->configuration = new_configuration;
@@ -89,7 +89,7 @@ bool usb_set_configuration(
 
 	return true;
 }
-	
+
 static usb_request_status_t usb_send_descriptor(
 	usb_endpoint_t* const endpoint,
 	const uint8_t* const descriptor_data
@@ -148,7 +148,7 @@ static usb_request_status_t usb_standard_request_get_descriptor_setup(
 	switch( endpoint->setup.value_h ) {
 	case USB_DESCRIPTOR_TYPE_DEVICE:
 		return usb_send_descriptor(endpoint, endpoint->device->descriptor);
-		
+
 	case USB_DESCRIPTOR_TYPE_CONFIGURATION:
 		// TODO: Duplicated code. Refactor.
 		if( usb_speed(endpoint->device) == USB_SPEED_HIGH ) {
@@ -156,7 +156,7 @@ static usb_request_status_t usb_standard_request_get_descriptor_setup(
 		} else {
 			return usb_send_descriptor_config(endpoint, USB_SPEED_FULL, endpoint->setup.value_l);
 		}
-	
+
 	case USB_DESCRIPTOR_TYPE_DEVICE_QUALIFIER:
 		return usb_send_descriptor(endpoint, endpoint->device->qualifier_descriptor);
 
@@ -167,10 +167,10 @@ static usb_request_status_t usb_standard_request_get_descriptor_setup(
 		} else {
 			return usb_send_descriptor_config(endpoint, USB_SPEED_HIGH, endpoint->setup.value_l);
 		}
-	
+
 	case USB_DESCRIPTOR_TYPE_STRING:
 		return usb_send_descriptor_string(endpoint);
-		
+
 	case USB_DESCRIPTOR_TYPE_INTERFACE:
 	case USB_DESCRIPTOR_TYPE_ENDPOINT:
 	default:
@@ -185,7 +185,7 @@ static usb_request_status_t usb_standard_request_get_descriptor(
 	switch( stage ) {
 	case USB_TRANSFER_STAGE_SETUP:
 		return usb_standard_request_get_descriptor_setup(endpoint);
-		
+
 	case USB_TRANSFER_STAGE_DATA:
 	case USB_TRANSFER_STAGE_STATUS:
 		return USB_REQUEST_STATUS_OK;
@@ -212,7 +212,7 @@ static usb_request_status_t usb_standard_request_set_address(
 	switch( stage ) {
 	case USB_TRANSFER_STAGE_SETUP:
 		return usb_standard_request_set_address_setup(endpoint);
-		
+
 	case USB_TRANSFER_STAGE_DATA:
 	case USB_TRANSFER_STAGE_STATUS:
 		/* NOTE: Not necessary to set address here, as DEVICEADR.USBADRA bit
@@ -220,7 +220,7 @@ static usb_request_status_t usb_standard_request_set_address(
 		 * operation on IN ACK.
 		 */
 		return USB_REQUEST_STATUS_OK;
-		
+
 	default:
 		return USB_REQUEST_STATUS_STALL;
 	}
@@ -251,11 +251,11 @@ static usb_request_status_t usb_standard_request_set_configuration(
 	switch( stage ) {
 	case USB_TRANSFER_STAGE_SETUP:
 		return usb_standard_request_set_configuration_setup(endpoint);
-		
+
 	case USB_TRANSFER_STAGE_DATA:
 	case USB_TRANSFER_STAGE_STATUS:
 		return USB_REQUEST_STATUS_OK;
-		
+
 	default:
 		return USB_REQUEST_STATUS_STALL;
 	}
@@ -286,7 +286,7 @@ static usb_request_status_t usb_standard_request_get_configuration(
 	switch( stage ) {
 	case USB_TRANSFER_STAGE_SETUP:
 		return usb_standard_request_get_configuration_setup(endpoint);
-		
+
 	case USB_TRANSFER_STAGE_DATA:
 	case USB_TRANSFER_STAGE_STATUS:
 		return USB_REQUEST_STATUS_OK;
@@ -305,13 +305,13 @@ usb_request_status_t usb_standard_request(
 	switch( endpoint->setup.request ) {
 	case USB_STANDARD_REQUEST_GET_DESCRIPTOR:
 		return usb_standard_request_get_descriptor(endpoint, stage);
-	
+
 	case USB_STANDARD_REQUEST_SET_ADDRESS:
 		return usb_standard_request_set_address(endpoint, stage);
-		
+
 	case USB_STANDARD_REQUEST_SET_CONFIGURATION:
 		return usb_standard_request_set_configuration(endpoint, stage);
-		
+
 	case USB_STANDARD_REQUEST_GET_CONFIGURATION:
 		return usb_standard_request_get_configuration(endpoint, stage);
 

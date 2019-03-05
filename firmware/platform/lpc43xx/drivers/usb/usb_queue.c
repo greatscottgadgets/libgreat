@@ -15,8 +15,8 @@
 #include <libopencm3/cm3/cortex.h>
 #include <libopencm3/cm3/sync.h>
 
-#include <drivers/usb/lpc43xx/usb.h>
-#include <drivers/usb/lpc43xx/usb_queue.h>
+#include <drivers/usb/usb.h>
+#include <drivers/usb/usb_queue.h>
 
 // FIXME abstract:
 #define USB_ALLOC_TIMEOUT_DEFAULT_US (1000000UL)

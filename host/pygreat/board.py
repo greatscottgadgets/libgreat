@@ -46,6 +46,12 @@ class GreatBoard(object):
     BOARD_VENDOR_ID = 0
     BOARD_PRODUCT_ID = 0
 
+    # Commands for resetting a libgreat board.
+    RESET_REQUEST_NORMAL = 0
+    RESET_REQUEST_SWITCH_TO_EXTCLOCK = 1
+    RESET_REQUEST_MAINTAIN_ALWAYS_ON_DOMAIN = 2
+    RESET_REQUEST_POST_FIRMWARE_FLASH = 3
+
     @classmethod
     def autodetect(cls, **device_identifiers):
         """
@@ -306,8 +312,8 @@ class GreatBoard(object):
         self.__init__(**self.identifiers)
         self.initialize_apis()
 
-
-    def reset(self, reconnect=True, switch_to_external_clock=False):
+    def reset(self, reconnect=True, switch_to_external_clock=False,
+            is_post_firmware_flash=False, maintain_always_on_domain=False):
         """
         Reset the device.
 
@@ -316,18 +322,24 @@ class GreatBoard(object):
                 finish the reset and then attempt to reconnect.
             switch_to_external_clock -- If true, the device will accept a 12MHz
                 clock signal on P4_7 (J2_P11 on the GreatFET one) after the reset.
+            is_post_firmware_flash -- If true, the device will be notified that this immediately
+                follows a firmware flash, and can adjust its internal messages accordingly.
         """
+        reset_command = self.RESET_REQUEST_NORMAL
 
-        # FIXME: abstract
-        reset_type = 1 if switch_to_external_clock else 0
+        if switch_to_external_clock:
+            reset_command = self.RESET_REQUEST_SWITCH_TO_EXTCLOCK
+        elif maintain_always_on_domain:
+            reset_command = self.RESET_REQUEST_MAINTAIN_ALWAYS_ON_DOMAIN
+        elif is_post_firmware_flash:
+            reset_command = self.RESET_REQUEST_POST_FIRMWARE_FLASH
 
         try:
-            self.apis.core.request_reset(reset_type)
-        except usb.core.USBError as e:
+            self.apis.core.request_reset(reset_command)
+        except usb.core.USBError:
             pass
 
         # If we're to attempt a reconnect, do so.
-        connected = False
         if reconnect:
             time.sleep(RECONNECT_DELAY)
             self.try_reconnect()
@@ -341,8 +353,6 @@ class GreatBoard(object):
         source, rather than the onboard crystal oscillator.
         """
         self.reset(switch_to_external_clock=True)
-
-
 
     def close(self):
         """

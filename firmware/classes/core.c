@@ -1,7 +1,7 @@
 /*
  * This file is part of libgreat
  *
- * Core communications class -- provides 
+ * Core communications class -- provides
  */
 
 #include <stddef.h>
@@ -17,28 +17,28 @@
 
 extern struct comms_class *class_head;
 
-WEAK int core_verb_read_board_id(struct command_transaction *trans)
+ATTR_WEAK int core_verb_read_board_id(struct command_transaction *trans)
 {
 	(void)trans;
 	return ENOSYS;
 }
 
 
-WEAK int core_verb_read_version_string(struct command_transaction *trans)
+ATTR_WEAK int core_verb_read_version_string(struct command_transaction *trans)
 {
 	(void)trans;
 	return ENOSYS;
 }
 
 
-WEAK int core_verb_read_part_id(struct command_transaction *trans)
+ATTR_WEAK int core_verb_read_part_id(struct command_transaction *trans)
 {
 	(void)trans;
 	return ENOSYS;
 }
 
 
-WEAK int core_verb_read_serial_number(struct command_transaction *trans)
+ATTR_WEAK int core_verb_read_serial_number(struct command_transaction *trans)
 {
 	(void)trans;
 	return ENOSYS;
@@ -47,7 +47,7 @@ WEAK int core_verb_read_serial_number(struct command_transaction *trans)
 /**
  * TODO: get me out of here!
  */
-WEAK int core_verb_request_reset(struct command_transaction *trans)
+ATTR_WEAK int core_verb_request_reset(struct command_transaction *trans)
 {
 	(void)trans;
 	return ENOSYS;
@@ -56,14 +56,14 @@ WEAK int core_verb_request_reset(struct command_transaction *trans)
 
 /**
  * Internal introspection command that returns the list of supported classes.
- */ 
+ */
 static int verb_get_available_classes(struct command_transaction *trans)
 {
 	struct comms_class *cls;
 
 	// Add each class number to the list.
 	for (cls = class_head; cls; cls = cls->next) {
-		comms_response_add_uint32_t(trans, cls->class_number);	
+		comms_response_add_uint32_t(trans, cls->class_number);
 	}
 
 	return 0;
@@ -72,7 +72,7 @@ static int verb_get_available_classes(struct command_transaction *trans)
 
 /**
  * Internal introspection command that returns the list of supported classes.
- */ 
+ */
 static int verb_get_verb_name(struct command_transaction *trans)
 {
 	uint32_t class_number = comms_argument_parse_uint32_t(trans);
@@ -110,7 +110,7 @@ enum verb_descriptor_request {
 
 /**
  * Internal introspection command that returns information about a verb.
- */ 
+ */
 static int verb_get_verb_descriptor(struct command_transaction *trans)
 {
 	uint32_t class_number = comms_argument_parse_uint32_t(trans);
@@ -155,7 +155,7 @@ static int verb_get_verb_descriptor(struct command_transaction *trans)
 
 /**
  * Internal introspection command that returns the list of verbs for a given class.
- */ 
+ */
 static int verb_get_available_verbs(struct command_transaction *trans)
 {
 	uint32_t class_number = comms_argument_parse_uint32_t(trans);
@@ -171,7 +171,7 @@ static int verb_get_available_verbs(struct command_transaction *trans)
 
 	// Iterate through the array of command verbs, adding them to our response.
 	for (verb = relevant_class->command_verbs; verb->handler; ++verb) {
-		comms_response_add_uint32_t(trans, verb->verb_number);	
+		comms_response_add_uint32_t(trans, verb->verb_number);
 	}
 
 	return 0;
@@ -181,7 +181,7 @@ static int verb_get_available_verbs(struct command_transaction *trans)
 
 /**
  * Internal introspection command that returns the name for a given class.
- */ 
+ */
 static int verb_get_class_name(struct command_transaction *trans)
 {
 	uint32_t class_number = comms_argument_parse_uint32_t(trans);
@@ -203,7 +203,7 @@ static int verb_get_class_name(struct command_transaction *trans)
 
 /**
  * Internal introspection command that returns the documentation for a given class.
- */ 
+ */
 static int verb_get_class_docs(struct command_transaction *trans)
 {
 	uint32_t class_number = comms_argument_parse_uint32_t(trans);

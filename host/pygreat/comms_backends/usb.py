@@ -156,7 +156,7 @@ class USBCommsBackend(CommsBackend):
         """
         raw = self._vendor_request(usb.ENDPOINT_IN, request, length_or_data=length,
             value=value, index=index, timeout=timeout)
-        return raw.tostring().decode(encoding)
+        return raw.tobytes().ecode(encoding, errors='ignore')
 
 
     def _vendor_request_out(self, request, value=0, index=0, data=None, timeout=1000):
@@ -282,10 +282,10 @@ class USBCommsBackend(CommsBackend):
 
             # If we were passed an encoding, attempt to decode the response data.
             if encoding and response:
-                response = response.tostring().decode(encoding)
+                response = response.tobytes().decode(encoding, errors='ignore')
 
             # Return the device's response.
-            return response.tostring()
+            return response.tobytes()
 
         except Exception as e:
 

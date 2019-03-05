@@ -788,7 +788,7 @@ class CommsBackend(object):
 
             for index, value in enumerate(result):
                 if isinstance(value, bytes):
-                    result[index] = value.decode(encoding)
+                    result[index] = value.decode(encoding, errors='ignore')
 
             result = tuple(result)
 
@@ -942,6 +942,11 @@ class CommsApiCollection(object):
     def __init__(self, wrapped_dict):
         self.__dict__ = wrapped_dict
 
+    def __getattr__(self, name):
+        """ Trivial definition of __getattr_. Makes linters happy. """
+
+        return self.__dict__[name]
+
 
 def _generate_command_in_signature(in_format, in_names):
     """ Generates in-signature documentation for a given RPC.
@@ -1080,7 +1085,7 @@ def command_rpc(verb_number, in_format="", out_format="", name="function", class
         max_response_length = kwargs.pop('max_response_length', 4096)
 
         return self.execute_command(verb_number, in_format, out_format, name=name, class_name=class_name,
-                timeout=timeout, max_response_length=max_response_length, *arguments)
+                timeout=timeout, max_response_length=max_response_length, encoding=encoding, *arguments)
 
     # Apply our known documentation to the given command.
     method.__name__ = future_utils.native_str(name)
@@ -1129,7 +1134,7 @@ def c_string_return(raw_bytes, encoding='UTF-8'):
 
     # If we have an encoding argument, decode it.
     if encoding:
-        raw_strings = [string.decode(encoding) for string in raw_strings]
+        raw_strings = [string.decode(encoding, errors='ignore') for string in raw_strings]
 
     return tuple(raw_strings)
 

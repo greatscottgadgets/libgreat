@@ -35,7 +35,11 @@ SECTIONS
 {
 	.text : {
 		. = ALIGN(0x400);
-		_text_ram = 0; /* Start of Code in RAM NULL because Copy of Code from ROM to RAM disabled */
+
+        /* Don't provide relocation targets, as we're not performing relocation on direct-to-RAM and XIP loads. */
+        _text_segment_rom = 0;
+		_text_segment_ram = 0;
+
 		*(.vectors)	/* Vector table */
 		*(.text*)	/* Program code */
 		. = ALIGN(4);
@@ -73,7 +77,7 @@ SECTIONS
 	.ARM.extab : {
 		*(.ARM.extab*)
 	} >rom
-    
+
 	/* exception index - required due to libgcc.a issuing /0 exceptions */
 	.ARM.exidx : {
 		__exidx_start = .;
@@ -82,9 +86,11 @@ SECTIONS
 	} >rom
 
 	. = ALIGN(4);
-	_etext = .;
-	_etext_ram = 0; /* Start of Code in RAM NULL because Copy of Code from ROM to RAM disabled */
-	_etext_rom = 0; /* Start of Code in RAM NULL because Copy of Code from ROM to RAM disabled */
+    _text_segment_end = .;
+
+    /* Don't provide relocation targets, as we're not performing relocation on direct-to-RAM and XIP loads. */
+    _text_segment_rom_end = 0;
+    _text_segment_ram_end = 0;
 
 	. = ORIGIN(ram_local2);
 

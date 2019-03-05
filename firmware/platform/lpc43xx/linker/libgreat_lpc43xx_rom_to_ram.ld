@@ -35,7 +35,8 @@ SECTIONS
 {
 	.text : {
 		. = ALIGN(0x400);
-		_text_ram = (. - ORIGIN(rom)) + ORIGIN(ram_local1); /* Start of Code in RAM */
+        _text_segment_rom = .;
+		_text_segment_ram = (. - ORIGIN(rom)) + ORIGIN(ram_local1); /* Start of Code in RAM */
 
 		*(.vectors)	/* Vector table */
 		*(.text*)	/* Program code */
@@ -74,7 +75,7 @@ SECTIONS
 	.ARM.extab : {
 		*(.ARM.extab*)
 	} >rom
-    
+
 	/* exception index - required due to libgcc.a issuing /0 exceptions */
 	.ARM.exidx : {
 		__exidx_start = .;
@@ -83,9 +84,9 @@ SECTIONS
 	} >rom
 
 	. = ALIGN(4);
-	_etext = .;
-	_etext_ram = (. - ORIGIN(rom)) + ORIGIN(ram_local1);
-	_etext_rom = (. - ORIGIN(rom)) + ORIGIN(rom_flash);
+	_text_segment_end = .;
+	_text_segment_ram_end = (. - ORIGIN(rom)) + ORIGIN(ram_local1);
+	_text_segment_rom_end = (. - ORIGIN(rom)) + ORIGIN(rom_flash);
 
 	. = ORIGIN(ram_local2);
 

@@ -22,43 +22,6 @@ function(generate_linker_script_arguments OUTPUT_VARIABLE)
 	set("${OUTPUT_VARIABLE}" "${ARGUMENTS}" PARENT_SCOPE)
 endfunction()
 
-#
-# Function that creates a new GreatFET library / source archive.
-# Arguments: [library_name] [sources...]
-#
-function(add_libgreat_library LIBRARY_NAME)
-
-	# Create the relevant library.
-	add_library(${LIBRARY_NAME} ${ARGN})
-
-	# And set its default properties.
-	target_include_directories(${LIBRARY_NAME} PRIVATE
-		${BOARD_INCLUDE_DIRECTORIES}
-		${BUILD_INCLUDE_DIRECTORIES}
-		${PATH_LIBOPENCM3}/include
-		${PATH_GREATFET_FIRMWARE_COMMON}
-		${PATH_LIBGREAT}/firmware/include
-		${PATH_LIBGREAT}/firmware/include/platform/${LIBGREAT_PLATFORM}
-	)
-	target_compile_options(${LIBRARY_NAME} PRIVATE ${FLAGS_COMPILE_COMMON} ${FLAGS_ARCHITECTURE} ${FLAGS_MAIN_CPU})
-	target_compile_definitions(${LIBRARY_NAME} PRIVATE ${DEFINES_COMMON} ${DEFINES_BOARD})
-
-endfunction(add_libgreat_library)
-
-
-#
-# Function that creates a new GreatFET library / source archive iff the relevant library does not exist.
-# Arguments: [library_name] [sources...]
-#
-function(add_libgreat_library_if_necessary LIBRARY_NAME)
-
-	# If the target doesn't already exist, create it.
-	if (NOT TARGET ${LIBRARY_NAME})
-		add_libgreat_library(${LIBRARY_NAME} ${ARGN})
-	endif()
-
-endfunction(add_libgreat_library_if_necessary)
-
 
 #
 # Function that adds a flash "executable" target to the currrent build.
@@ -107,18 +70,16 @@ function(add_libgreat_library LIBRARY_NAME)
 		${PATH_LIBOPENCM3}/include
 		${PATH_GREATFET_FIRMWARE_COMMON} #XXX: remove this!
 		${PATH_LIBGREAT_FIRMWARE}/include
-		${PATH_LIBGREAT}/firmware/include/platform/${LIBGREAT_PLATFORM}
+		${PATH_LIBGREAT_FIRMWARE_PLATFORM}/include
 	)
 	target_compile_options(${LIBRARY_NAME} PRIVATE ${FLAGS_COMPILE_COMMON} ${FLAGS_ARCHITECTURE} ${FLAGS_MAIN_CPU})
 	target_compile_definitions(${LIBRARY_NAME} PRIVATE ${DEFINES_COMMON} ${DEFINES_BOARD})
 
 endfunction(add_libgreat_library)
 
-
 #
-# Function that creates a new libgreat library / source collection iff the relevant library does not exist.
-
-# Arguments: <library_name> [sources...]
+# Function that creates a new GreatFET library / source archive iff the relevant library does not exist.
+# Arguments: [library_name] [sources...]
 #
 function(add_libgreat_library_if_necessary LIBRARY_NAME)
 
@@ -128,6 +89,7 @@ function(add_libgreat_library_if_necessary LIBRARY_NAME)
 	endif()
 
 endfunction(add_libgreat_library_if_necessary)
+
 
 
 #

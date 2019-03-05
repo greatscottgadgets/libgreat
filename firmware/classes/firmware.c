@@ -28,7 +28,7 @@
  *  - a uint32_t that indicates the device's page size in bytes.
  *  - a uint32_t that indicates the device's total size, in bytes
  */
-WEAK int firmware_verb_initialize(struct command_transaction *trans)
+ATTR_WEAK int firmware_verb_initialize(struct command_transaction *trans)
 {
 	(void)trans;
 	return ENOSYS;
@@ -40,7 +40,7 @@ WEAK int firmware_verb_initialize(struct command_transaction *trans)
  *
  * Accepts no arguments.
  */
-WEAK int firmware_verb_full_erase(struct command_transaction *trans)
+ATTR_WEAK int firmware_verb_full_erase(struct command_transaction *trans)
 {
 	(void)trans;
 	return ENOSYS;
@@ -51,7 +51,7 @@ WEAK int firmware_verb_full_erase(struct command_transaction *trans)
  *
  * Accepts a uint32_t that indicates the address.
  */
-WEAK int firmware_verb_erase_page(struct command_transaction *trans)
+ATTR_WEAK int firmware_verb_erase_page(struct command_transaction *trans)
 {
 	(void)trans;
 	return ENOSYS;
@@ -63,7 +63,7 @@ WEAK int firmware_verb_erase_page(struct command_transaction *trans)
  *
  * Accepts a uint32_t that is the address; followed by a single page of data.
  */
-WEAK int firmware_verb_write_page(struct command_transaction *trans)
+ATTR_WEAK int firmware_verb_write_page(struct command_transaction *trans)
 {
 	(void)trans;
 	return ENOSYS;
@@ -76,7 +76,7 @@ WEAK int firmware_verb_write_page(struct command_transaction *trans)
  * Accepts a uint32_t that is the address.
  * Returns the relevant page.
  */
-WEAK int firmware_verb_read_page(struct command_transaction *trans)
+ATTR_WEAK int firmware_verb_read_page(struct command_transaction *trans)
 {
 	(void)trans;
 	return ENOSYS;

@@ -12,8 +12,8 @@
 #include <drivers/comms_backend.h>
 #include <drivers/usb/comms_backend.h>
 
-#include <drivers/usb/lpc43xx/usb_standard_request.h>
-#include <drivers/usb/lpc43xx/usb_queue.h>
+#include <drivers/usb/usb_standard_request.h>
+#include <drivers/usb/usb_queue.h>
 
 #define LIBGREAT_REQUEST_CANCEL_VALUE (0xDEAD)
 
@@ -131,7 +131,10 @@ static usb_request_status_t libgreat_comms_vendor_request_out_handler(
 		// Otherwise, ACK the transcation.
 		else {
 			rc = usb_transfer_schedule_ack(endpoint->in);
-			return rc ? USB_REQUEST_STATUS_STALL : USB_REQUEST_STATUS_OK;
+			if(rc) {
+				pr_warning("warning: comms: could not ACK the start of a USB comms request (%d)\n", rc);
+				return USB_REQUEST_STATUS_STALL;
+			}
 		}
 	}
 
@@ -184,10 +187,13 @@ static usb_request_status_t libgreat_comms_vendor_request_in_handler(
 		if (sizeof(usb_data_out_buffer) < data_length) {
 			data_length = sizeof(usb_data_out_buffer);
 		}
+
 		// Schedule the transfer itself.
-		rc = usb_transfer_schedule_block(endpoint->in, usb_data_out_buffer,
-				data_length, NULL, NULL);
-		return rc ? USB_REQUEST_STATUS_STALL : USB_REQUEST_STATUS_OK;
+		rc = usb_transfer_schedule_block(endpoint->in, usb_data_out_buffer, data_length, NULL, NULL);
+		if (rc) {
+			pr_warning("warning: comms: could not respond to a USB comms request (%d) \n", rc);
+			return USB_REQUEST_STATUS_STALL;
+		}
 	}
 
 	// If this is the end of the DATA stage, queue an ACK for the status stage.
@@ -195,7 +201,10 @@ static usb_request_status_t libgreat_comms_vendor_request_in_handler(
 	if (stage == USB_TRANSFER_STAGE_DATA) {
 		transaction_underway = false;
 		rc = usb_transfer_schedule_ack(endpoint->out);
-		return rc ? USB_REQUEST_STATUS_STALL : USB_REQUEST_STATUS_OK;
+		if(rc) {
+			pr_warning("warning: comms: could not ACK the response to a USB comms request (%d)\n", rc);
+			return USB_REQUEST_STATUS_STALL;
+		}
 	}
 
 	return USB_REQUEST_STATUS_OK;
@@ -227,15 +236,20 @@ static usb_request_status_t libgreat_comms_vendor_request_cancel_handler(
 
 		// Schedule a respone
 		rc = usb_transfer_schedule_block(endpoint->in, &last_errno, sizeof(last_errno), NULL, NULL);
-		return rc ? USB_REQUEST_STATUS_STALL : USB_REQUEST_STATUS_OK;
+		if(rc) {
+			pr_warning("warning: comms: could not send the response to a USB comms request (%d)\n", rc);
+			return USB_REQUEST_STATUS_STALL;
+		}
 	}
 
 	// If this is the data stage, ACk our transaction and complete.
 	if (stage == USB_TRANSFER_STAGE_DATA) {
 		rc = usb_transfer_schedule_ack(endpoint->out);
-		return rc ? USB_REQUEST_STATUS_STALL : USB_REQUEST_STATUS_OK;
+		if(rc) {
+			pr_warning("warning: comms: could not ACK the cancellation of a USB comms request (%d)\n", rc);
+			return USB_REQUEST_STATUS_STALL;
+		}
 	}
-
 
 	return USB_REQUEST_STATUS_OK;
 }

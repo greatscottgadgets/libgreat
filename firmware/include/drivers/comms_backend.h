@@ -5,8 +5,8 @@
  * the standard communications protocol.
  */
 
-#include <drivers/usb/lpc43xx/usb_type.h>
-#include <drivers/usb/lpc43xx/usb_request.h>
+#include <drivers/usb/usb_type.h>
+#include <drivers/usb/usb_request.h>
 #include <toolchain.h>
 
 /**
@@ -35,7 +35,7 @@ struct ATTR_PACKED libgreat_command_prelude {
  * @param trans An object representing the command to be submitted, and its
  *		response.
  */
-int comms_backend_submit_command(struct comm_backend_driver *backend, 
+int comms_backend_submit_command(struct comm_backend_driver *backend,
 	struct command_transaction *trans);
 
 
