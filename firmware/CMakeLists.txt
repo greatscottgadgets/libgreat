@@ -30,10 +30,15 @@ define_libgreat_module(allocator
 
 # Provide the core communications protocol.
 define_libgreat_module(comms
-	${CMAKE_CURRENT_SOURCE_DIR}/drivers/comms/utils.c
-	${CMAKE_CURRENT_SOURCE_DIR}/drivers/comms/comms_class.c
-	${CMAKE_CURRENT_SOURCE_DIR}/classes/core.c
-	${CMAKE_CURRENT_SOURCE_DIR}/classes/firmware.c
+	${PATH_LIBGREAT_FIRMWARE_DRIVERS}/comms/utils.c
+	${PATH_LIBGREAT_FIRMWARE_DRIVERS}/comms/comms_class.c
+	${PATH_LIBGREAT_FIRMWARE}/classes/core.c
+	${PATH_LIBGREAT_FIRMWARE}/classes/firmware.c
+)
+
+# DAC drivers.
+define_libgreat_module(ad970x
+	${PATH_LIBGREAT_FIRMWARE_DRIVERS}/dac/ad970x.c
 )
 
 # FIXME: get rid of this
