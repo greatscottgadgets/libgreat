@@ -429,6 +429,7 @@ int platform_enable_base_clock(platform_base_clock_register_t *base)
 {
 	int rc;
 	platform_base_clock_t value;
+	clock_source_t source;
 
 	// Identify the relevant configuration for the given base clock.
 	platform_base_clock_configuration_t *config = platform_find_config_for_base_clock(base);
@@ -439,22 +440,25 @@ int platform_enable_base_clock(platform_base_clock_register_t *base)
 		return 0;
 	}
 
+	// Translate the clock source into a physical clock source.
+	source = platform_get_physical_clock_source(config->source);
+
 	// Switch the base clock to its relevant clock source.
-	rc = platform_handle_dependencies_for_clock_source(config->source);
+	rc = platform_handle_dependencies_for_clock_source(source);
 	if (rc && !config->no_fallback) {
 		pr_warning("failed to bring up source %s for base clock %s; falling back to internal oscillator!\n",
-			platform_get_clock_source_name(config->source), platform_get_base_clock_name(base));
+			platform_get_clock_source_name(source), platform_get_base_clock_name(base));
 		config->source = CLOCK_SOURCE_INTERNAL_OSCILLATOR;
 	}
 	else if (rc) {
 		pr_warning("failed to bring up source %s for base clock %s; trying to continue anyway.\n",
-			platform_get_clock_source_name(config->source), platform_get_base_clock_name(base));
+			platform_get_clock_source_name(source), platform_get_base_clock_name(base));
 	}
 
 	// Finally, ensure the clock is powered up.
 	value.power_down = 0;
 	value.block_during_changes = 0;
-	value.source = config->source;
+	value.source = source;
 	value.divisor = 0;
 	base->all_bits = value.all_bits;
 
