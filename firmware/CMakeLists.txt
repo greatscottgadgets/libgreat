@@ -41,5 +41,10 @@ define_libgreat_module(ad970x
 	${PATH_LIBGREAT_FIRMWARE_DRIVERS}/dac/ad970x.c
 )
 
+# Scheduler.
+define_libgreat_module(scheduler
+	${PATH_LIBGREAT_FIRMWARE_DRIVERS}/scheduler.c
+)
+
 # FIXME: get rid of this
 add_dependencies(libgreat libopencm3)

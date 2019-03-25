@@ -69,6 +69,17 @@ SECTIONS
 		KEEP (*(SORT(.fini_array.*)))
 		__fini_array_end = .;
 	} >rom
+	/**
+	 * Array of task pointers that allow us to schedule things without explicitly adding them to our main routine.
+	 * Supports our simple round-robin scheduler.
+	 */
+	.task_array : {
+		. = ALIGN(4);
+		__task_array_start = .;
+		KEEP (*(.task_array))
+		KEEP (*(SORT(.task_array.*)))
+		__task_array_end = .;
+	} >rom
 
 	/*
 	 * Another section used by C++ stuff, appears when using newlib with

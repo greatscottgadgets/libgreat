@@ -43,6 +43,13 @@
 #define CALL_BEFORE_RESET(fini) \
 	__attribute__((section(".fini_array"), used)) static typeof(init) *fini##_finalizer_p = fini;
 
+/**
+ * Macros for simple scheduler support. This uses the same type of linker magic as .init/.fini to populate
+ * a simple array of pointers that we can easily iterate over.
+ */
+#define DEFINE_TASK(task) \
+	__attribute__((section(".task_array"), used)) static typeof(task) *task##_implementation_p = task;
+
 
 /**
  * Compile-time error detection.
