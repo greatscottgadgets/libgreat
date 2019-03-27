@@ -12,7 +12,6 @@
 
 #include <toolchain.h>
 
-
 // Don't try to bring up any clock more than five times.
 static const uint32_t platform_clock_max_bringup_attempts = 5;
 
@@ -56,6 +55,8 @@ static char *platform_get_base_clock_name(platform_base_clock_t *base);
 static platform_base_clock_t *platform_base_clock_for_divider(clock_source_t source);
 static int platform_bring_up_audio_pll(void);
 static int platform_bring_up_usb_pll(void);
+static int platform_bring_up_clock_divider(clock_source_t source, bool handle_dependencies);
+
 
 // Set to true once we're finished with early initialization.
 // (We can't do some things until early init completes.)
@@ -457,7 +458,7 @@ int platform_enable_base_clock(platform_base_clock_register_t *base)
 
 	// Finally, ensure the clock is powered up.
 	value.power_down = 0;
-	value.block_during_changes = 0;
+	value.block_during_changes = 1;
 	value.source = source;
 	value.divisor = 0;
 	base->all_bits = value.all_bits;
@@ -951,8 +952,9 @@ static uint32_t platform_detect_usb_pll_frequency(void)
 	platform_base_clock_t *divider = &cgu->idiva;
 	uint32_t divided_frequency;
 
+	platform_bring_up_clock_divider(CLOCK_SOURCE_DIVIDER_A_OUT, false);
+
 	// If the divider isn't set up to divide the USB PLL, return a low-precision measurement.
-	//platform_handle_dependencies_for_clock_source(CLOCK_SOURCE_DIVIDER_A_OUT);
 	if ((divider->source != CLOCK_SOURCE_PLL0_USB) || divider->power_down) {
 		return platform_detect_clock_source_frequency_directly(CLOCK_SOURCE_PLL0_USB);
 	}
@@ -983,6 +985,11 @@ uint32_t platform_detect_clock_source_frequency_via_divider(clock_source_t clock
 	const uint32_t divider_cutoff = 240 * MHZ;
 	const uint32_t scale_factor = 4;
 
+	// If this is the USB PLL, this can only drive divider A. We'll need to take special steps.
+	if (clock_to_detect == CLOCK_SOURCE_PLL0_USB) {
+		return platform_detect_usb_pll_frequency();
+	}
+
 	// Get an initial measurement, which will determine if we need to re-compute using our divider.
 	uint32_t frequency = platform_detect_clock_source_frequency_directly(clock_to_detect);
 
@@ -998,10 +1005,6 @@ uint32_t platform_detect_clock_source_frequency_via_divider(clock_source_t clock
 		return 0;
 	}
 
-	// If this is the USB PLL, this can only drive divider A. We'll need to take special steps.
-	if (clock_to_detect == CLOCK_SOURCE_PLL0_USB) {
-;		return platform_detect_usb_pll_frequency();
-	}
 
 	// If the dividier is CLOCK_SOURCE_NONE
 	if (divider == CLOCK_SOURCE_NONE) {
@@ -1179,11 +1182,11 @@ static platform_base_clock_t *platform_base_clock_for_divider(clock_source_t sou
  * @source The clock source corresponding to the relevant clock divider.
  * @return 0 on success, or an error number on failure
  */
-static int platform_bring_up_clock_divider(clock_source_t source)
+static int platform_bring_up_clock_divider(clock_source_t source, bool handle_dependencies)
 {
 	int rc;
 
-	// Find the base clock that coresponds tro the given divider.
+	// Find the base clock that coresponds to the given divider.
 	platform_base_clock_t *clock = platform_base_clock_for_divider(source);
 	platform_base_clock_t value;
 
@@ -1196,17 +1199,21 @@ static int platform_bring_up_clock_divider(clock_source_t source)
 	const platform_base_clock_configuration_t *config = platform_find_config_for_base_clock(clock);
 
 	// ... and finally, enable the given clock.
-	rc = platform_handle_dependencies_for_clock_source(config->source);
-	if (rc) {
-		return rc;
+	if (handle_dependencies) {
+		rc = platform_handle_dependencies_for_clock_source(config->source);
+		if (rc) {
+			return rc;
+		}
 	}
 
 	// Build the value to apply, and then apply it all at once, so we don't leave the write mid-configuration.
 	value.power_down = 0;
-	value.block_during_changes = 0;
+	value.block_during_changes = 1;
 	value.source = config->source;
 	value.divisor = config->divisor - 1;
 	clock->all_bits = value.all_bits;
+
+	// TODO: possibly validate the clock frequency?
 
 	return 0;
 }
@@ -1381,6 +1388,10 @@ static void platform_soft_start_cpu_clock(void)
 	if (rc) {
 		return;
 	}
+
+	// Configure the system bus to block during all future frequency changes, to make sure we never accidentally
+	// clock-glitch the CPU.
+	cgu->pll1.block_during_frequency_changes = 1;
 
 	// If we're currently bypassing the output divider, turning the divider
 	// on (and to its least setting) achieves a trivial divide-by-two.
@@ -1588,7 +1599,7 @@ static int platform_bring_up_usb_pll(void)
 
 	// Power off the PLL for configuration.
 	cgu->pll_usb.powered_down = 1;
-	cgu->pll_usb.block_during_frequency_changes = 0;
+	cgu->pll_usb.block_during_frequency_changes = 1;
 
 	// Configure the PLL's source.
 	cgu->pll_usb.source = platform_get_physical_clock_source(config->source);
@@ -1657,7 +1668,7 @@ static int platform_handle_dependencies_for_clock_source(clock_source_t source)
 		case CLOCK_SOURCE_DIVIDER_C_OUT:
 		case CLOCK_SOURCE_DIVIDER_D_OUT:
 		case CLOCK_SOURCE_DIVIDER_E_OUT:
-			return platform_bring_up_clock_divider(source);
+			return platform_bring_up_clock_divider(source, true);
 
 		// If the clock source is based on the main PLL, bring it up.
 		case CLOCK_SOURCE_PLL1:
