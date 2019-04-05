@@ -203,10 +203,24 @@ endmacro(dependent_configuration_feature)
 #
 # Mark a non-feature as depending on a feature. Used to mask off configuration options that don't apply when a feature is off.
 #
-macro(configuration_depends_on_feature CONFIG_NAME FEATURE)
-    if (FEATURE_ENABLE_${FEATURE})
-        mark_as_advanced(CLEAR ${CONFIG_NAME})
+function(configuration_depends_on_features CONFIG_NAME)
+	set(ALL_ENABLED ON)
+
+	# Check to see if all of our dependencies are met.
+	foreach (FEATURE ${ARGN})
+		if (NOT FEATURE_ENABLE_${FEATURE})
+			message(STATUS "not enabling ${CONFIG_NAME} as ${FEATURE} isn't on")
+			set(ALL_ENABLED OFF)
+		endif()
+	endforeach()
+
+	# If they are, show the option...
+    if (ALL_ENABLED)
+		mark_as_advanced(CLEAR ${CONFIG_NAME})
+
+	# ... otherwise, hide it.
     else()
         mark_as_advanced(FORCED ${CONFIG_NAME})
-    endif()
-endmacro(configuration_depends_on_feature)
+	endif()
+
+endfunction(configuration_depends_on_features)
