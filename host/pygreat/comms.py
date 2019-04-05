@@ -1209,7 +1209,12 @@ class CommsClass(object):
 
         # Ensure that the class is defined enough.
         if self.CLASS_NUMBER is None:
-            raise ArgumentError("This class is implemented improperly -- it must define CLASS_NUMBER! Object: {}".format(self))
+            raise ValueError("This class is implemented improperly -- it must define CLASS_NUMBER! Object: {}".format(self))
+
+
+    def supports_verb(self, verb_name):
+        """ Returns true iff the given comms class supports a verb with the given name. """
+        return hasattr(self, verb_name)
 
 
     def execute_command(self, verb, in_format, out_format, *arguments, **kwargs):

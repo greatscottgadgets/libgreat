@@ -4,6 +4,8 @@
 #
 include_guard()
 
+include(CMakeDependentOption)
+
 # Horrible hack: use libopencm3, for now.
 include ("${PATH_LIBGREAT_FIRMWARE}/cmake/libopencm3.cmake")
 
@@ -41,6 +43,7 @@ function(add_flash_executable EXECUTABLE_NAME)
 		${FLAGS_LINK_BOARD}
 		${FLAGS_LINKER_SCRIPTS}
 		${FLAGS_LINK_MAIN_CPU}
+		${FLAGS_LINK_COMMON}
 	)
 	target_link_directories(${EXECUTABLE_NAME}.elf PRIVATE
 		${PATH_LIBOPENCM3}/lib
@@ -147,6 +150,11 @@ function(use_libgreat_modules TARGET_NAME)
 		get_target_property(MODULE_SOURCES libgreat_module_${MODULE} SOURCES)
 		target_sources(${TARGET_NAME} PRIVATE ${MODULE_SOURCES})
 
+		# Set a definition that marks that we have the relevant module.
+		string(TOUPPER "${MODULE}" MODULE_UPPERCASE)
+		string(REPLACE "-" "_" MODULE_MACRO "${MODULE_UPPERCASE}")
+		target_compile_definitions(${TARGET_NAME} PUBLIC HAS_LIBGREAT_MODULE_${MODULE_MACRO})
+
 		# Include any includes specified for interfacing with the given target in the downstream target.
 		get_target_property(ADDITIONAL_INCLUDES libgreat_module_${MODULE} INTERFACE_INCLUDE_DIRECTORIES)
 		if (NOT ${ADDITIONAL_INCLUDES} MATCHES "-NOTFOUND$")
@@ -156,3 +164,49 @@ function(use_libgreat_modules TARGET_NAME)
 	endforeach(MODULE)
 
 endfunction(use_libgreat_modules)
+
+#
+# Function that generates a configuration entry in a build configuration file for a libgreat feature.
+# Generates a CONFIG_ENABLE_<x> entry from a FEATURE_ENABLE_<x> variable, which contains "#define CONFIG_ENABLE_<x>"
+# where appropriate, or an appropriate C++-style comment otherwise.
+#
+function(libgreat_configuration_for_feature FEATURE_NAME)
+
+	if (FEATURE_ENABLE_${FEATURE_NAME})
+		set(CONFIG_ENABLE_${FEATURE_NAME} "#define CONFIG_ENABLE_${FEATURE_NAME}" PARENT_SCOPE)
+	else()
+		set(CONFIG_ENABLE_${FEATURE_NAME} "//#define CONFIG_ENABLE_${FEATURE_NAME}" PARENT_SCOPE)
+	endif()
+
+endfunction(libgreat_configuration_for_feature)
+
+
+#
+# Macro that assists in generation of a quick feature options that make their way into config.h.
+# Takes thes same arguments as option(), but generates a CONFIG_ENABLE_<name> variable that contains
+# either a C define with the same name, or a commented-version of that define for disabled features.
+#
+macro(configuration_feature FEATURE_NAME DESCRIPTION DEFAULT)
+    option(FEATURE_ENABLE_${FEATURE_NAME} "${DESCRIPTION}" ${DEFAULT})
+    libgreat_configuration_for_feature(${FEATURE_NAME})
+endmacro(configuration_feature)
+
+#
+# Special version of configuration_feature that allow for depenedent options
+#
+macro(dependent_configuration_feature FEATURE_NAME DEPENDS_ON DESCRIPTION DEFAULT)
+    # TODO: iterate over this and prepend each with their relevant option
+    cmake_dependent_option(FEATURE_ENABLE_${FEATURE_NAME} "${DESCRIPTION}" ${DEFAULT} FEATURE_ENABLE_${DEPENDS_ON} OFF)
+    libgreat_configuration_for_feature(${FEATURE_NAME})
+endmacro(dependent_configuration_feature)
+
+#
+# Mark a non-feature as depending on a feature. Used to mask off configuration options that don't apply when a feature is off.
+#
+macro(configuration_depends_on_feature CONFIG_NAME FEATURE)
+    if (FEATURE_ENABLE_${FEATURE})
+        mark_as_advanced(CLEAR ${CONFIG_NAME})
+    else()
+        mark_as_advanced(FORCED ${CONFIG_NAME})
+    endif()
+endmacro(configuration_depends_on_feature)
