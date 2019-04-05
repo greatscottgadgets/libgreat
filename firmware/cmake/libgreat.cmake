@@ -209,7 +209,6 @@ function(configuration_depends_on_features CONFIG_NAME)
 	# Check to see if all of our dependencies are met.
 	foreach (FEATURE ${ARGN})
 		if (NOT FEATURE_ENABLE_${FEATURE})
-			message(STATUS "not enabling ${CONFIG_NAME} as ${FEATURE} isn't on")
 			set(ALL_ENABLED OFF)
 		endif()
 	endforeach()
