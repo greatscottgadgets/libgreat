@@ -143,11 +143,6 @@ SECTIONS
 	} >ram_local2
 
 
-	/* exception unwind data - required due to libgcc.a issuing /0 exceptions */
-	.ARM.extab : {
-		*(.ARM.extab*)
-	} >ram_local2
-
 	/*
 	 * The .eh_frame section appears to be used for C++ exception handling.
 	 * You may need to fix this if you're using C++.

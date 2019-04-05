@@ -81,7 +81,7 @@ SECTIONS
 	.ARM.extab : {
 		*(.ARM.extab*)
 	} >ram_local1
-    
+
 	/* exception index - required due to libgcc.a issuing /0 exceptions */
 	.ARM.exidx : {
 		__exidx_start = .;
@@ -115,10 +115,6 @@ SECTIONS
 		_ebss = .;
 	} >ram_local2
 
-	/* exception unwind data - required due to libgcc.a issuing /0 exceptions */
-	.ARM.extab : {
-		*(.ARM.extab*)
-	} >ram_local2
 
 	/*
 	 * The .eh_frame section appears to be used for C++ exception handling.
