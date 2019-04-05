@@ -23,6 +23,7 @@
 #define ATTR_NAKED        __attribute__((naked))
 #define ATTR_PRINTF       __attribute__((format (printf, 1, 2)))
 #define ATTR_PRINTF_N(n)  __attribute__((format (printf, n, n + 1)))
+#define ATTR_USED         __attribute__((used))
 
 
 /**
