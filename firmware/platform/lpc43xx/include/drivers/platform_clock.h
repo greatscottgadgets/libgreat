@@ -593,4 +593,16 @@ uint32_t platform_get_branch_clock_frequency(platform_branch_clock_t *clock);
  */
 clock_source_t platform_get_parent_clock_source(clock_source_t source);
 
+/**
+ * Returns the name of the clock source currently driving the CPU, as a string.
+ * Intended for debugging, only.
+ */
+const char *platform_get_cpu_clock_source_name(void);
+
+/**
+ * Returns the frequency of the clock source currently driving the CPU.
+ * Intended for debugging, only.
+ */
+uint32_t platform_get_cpu_clock_source_frequency(void);
+
 #endif

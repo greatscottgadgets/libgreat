@@ -56,3 +56,7 @@ define_libgreat_module(usb_comms
 define_libgreat_module(gpio
 	${PATH_LIBGREAT_FIRMWARE_PLATFORM_DRIVERS}/gpio.c
 )
+
+# Backtrace support.
+define_libgreat_module(debug-backtrace ${PATH_LIBGREAT_FIRMWARE}/third-party/backtrace/backtrace.c)
+libgreat_module_include_directories(debug-backtrace ${PATH_LIBGREAT_FIRMWARE}/third-party/backtrace/)

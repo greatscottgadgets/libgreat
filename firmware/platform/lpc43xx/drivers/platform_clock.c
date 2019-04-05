@@ -1297,7 +1297,7 @@ static int platform_configure_main_pll_parameters(uint32_t target_frequency, uin
 	// If the target frequency is too low for our PLL to synthesize using its CCO, increase our target frequency,
 	// but compensate by increasing our output divider.
 	while (target_frequency < cco_low_bound) {
-		pr_info("pll1: target frequency %" PRIu32 " Hz < CCO_min; doubling to %" PRIu32 " Hz and compensating with post-divider\n",
+		pr_debug("pll1: target frequency %" PRIu32 " Hz < CCO_min; doubling to %" PRIu32 " Hz and compensating with post-divider\n",
 				target_frequency, target_frequency * 2);
 		output_divisor++;
 		target_frequency *= 2;
@@ -2144,4 +2144,25 @@ void platform_initialize_clocks(void)
 	}
 
 	pr_info("System clock bringup complete.\n");
+}
+
+/**
+ * Returns the name of the clock source currently driving the CPU, as a string.
+ * Intended for debugging, only.
+ */
+const char *platform_get_cpu_clock_source_name(void)
+{
+	platform_base_clock_t *m4 = BASE_CLOCK(m4);
+	return platform_get_clock_source_name(m4->source);
+}
+
+
+/**
+ * Returns the frequency of the clock source currently driving the CPU.
+ * Intended for debugging, only.
+ */
+uint32_t platform_get_cpu_clock_source_frequency(void)
+{
+	platform_base_clock_t *m4 = BASE_CLOCK(m4);
+	return platform_get_base_clock_frequency(m4);
 }

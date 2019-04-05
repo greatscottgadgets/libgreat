@@ -20,6 +20,7 @@
 #define ATTR_SECTION(x)   __attribute__((section(x)))
 #define ATTR_WEAK         __attribute__((weak))
 #define ATTR_NORETURN     __attribute__((noreturn))
+#define ATTR_NAKED        __attribute__((naked))
 #define ATTR_PRINTF       __attribute__((format (printf, 1, 2)))
 #define ATTR_PRINTF_N(n)  __attribute__((format (printf, n, n + 1)))
 

@@ -6,10 +6,24 @@ include_guard()
 
 # Define that this is an LPC43xx platform.
 set(LIBGREAT_PLATFORM  lpc43xx)
+set(LIBGREAT_ARCHITECTURE arm-v7m)
 
 # TODO: do we want to use the hard-float ABI, or do we want to make these inter-linkable?
+set(FLAGS_PLATFORM                 -ffunction-sections -fdata-sections)
 set(FLAGS_MAIN_CPU                 -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16)
 set(FLAGS_SECONDARY_CPU            -mcpu=cortex-m0 -mfloat-abi=soft)
+
+# FIXME: move some of this to an arm-v7m archictecture file
+# TODO: decide if we want this off unless debugging is on
+option(FEATURE_ENABLE_BACKTRACE "Enables rich debug back-tracking at a cost of a slightly increased build size." ON)
+if (FEATURE_ENABLE_BACKTRACE)
+    set(FLAGS_PLATFORM                 ${FLAGS_PLATFORM} -funwind-tables -fno-omit-frame-pointer)
+endif()
+
+option(FEATURE_ENABLE_FUNCTION_NAMES "Enables function names in output files, which improves debug messages but significantly increases file size." ${DEFAULT_DEBUG_ONLY})
+if (FEATURE_ENABLE_FUNCTION_NAMES)
+    set(FLAGS_PLATFORM                 ${FLAGS_PLATFORM} -mpoke-function-name)
+endif()
 
 set(FLAGS_LINK_BOARD               -nostartfiles -Wl,--gc-sections)
 set(FLAGS_LINK_MAIN_CPU            -Xlinker -Map=m4.map)
