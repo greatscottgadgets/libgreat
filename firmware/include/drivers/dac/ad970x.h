@@ -15,19 +15,15 @@
  */
 typedef struct {
 
-	// GPIO port locations for each of the given GPIO pins.
-	uint8_t gpio_port_cs;
-	uint8_t gpio_port_sck;
-	uint8_t gpio_port_data;
-	uint8_t gpio_port_mode;
+	// GPIO locations for each of the GPIO pins in our DAC interface.
+	gpio_pin_t gpio_cs;
+	gpio_pin_t gpio_sck;
+	gpio_pin_t gpio_data;
+	gpio_pin_t gpio_mode;
 
-	// GPIO pin locations for each of the given GPIO pins.
-	uint8_t gpio_pin_cs;
-	uint8_t gpio_pin_sck;
-	uint8_t gpio_pin_data;
-	uint8_t gpio_pin_mode;
-
+	//
 	// Internal fields:
+	//
 
 	// The length of a half-period of the DAC configuration clock.
 	uint32_t config_half_period;

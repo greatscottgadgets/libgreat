@@ -5,6 +5,7 @@
  */
 
 #include <drivers/platform_config.h>
+#include <libopencm3/lpc43xx/scu.h>
 
 /**
  * Return a reference to the LPC43xx's CREG block.

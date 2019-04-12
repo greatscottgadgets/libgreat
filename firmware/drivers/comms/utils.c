@@ -103,7 +103,7 @@ void *comms_response_add_string(struct command_transaction *trans, char const *c
  * Grabs a reference to a chunk of up to max_length from the argument buffer.
  *
  * @param trans The associated transaction.
- * @param max_length The maximum amount to read; or -1 for the remainder of the bfufer.
+ * @param max_length The maximum amount to read; or -1 for the remainder of the buffer.
  * @param out_length Out argument; accepts the actual amount read.
  * @return A pointer to a buffer within the transaction that contains the relevant data.
  */

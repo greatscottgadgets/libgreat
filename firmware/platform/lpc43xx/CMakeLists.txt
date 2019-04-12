@@ -19,6 +19,9 @@ define_libgreat_module(bsp
 	# Start of day code.
 	${PATH_LIBGREAT_FIRMWARE_PLATFORM}/crt0.c
 
+	# Vector table / interrupt controller code.
+	${PATH_LIBGREAT_FIRMWARE_PLATFORM_DRIVERS}/arm_vectors.c
+
 	# Timers.
 	${PATH_LIBGREAT_FIRMWARE_DRIVERS}/timer.c
 	${PATH_LIBGREAT_FIRMWARE_PLATFORM_DRIVERS}/platform_timer.c
@@ -63,6 +66,14 @@ define_libgreat_module(gpio
 define_libgreat_module(uart
 	${PATH_LIBGREAT_FIRMWARE_DRIVERS}/uart/ns16550.c
 	${PATH_LIBGREAT_FIRMWARE_PLATFORM_DRIVERS}/platform_uart.c
+)
+
+# GPIO module.
+define_libgreat_module(sgpio
+	${PATH_LIBGREAT_FIRMWARE_PLATFORM_DRIVERS}/sgpio.c
+	${PATH_LIBGREAT_FIRMWARE_PLATFORM_DRIVERS}/sgpio_data.c
+	${PATH_LIBGREAT_FIRMWARE_PLATFORM_DRIVERS}/sgpio_debug.c
+	${PATH_LIBGREAT_FIRMWARE_PLATFORM_DRIVERS}/sgpio.S
 )
 
 # Backtrace support.

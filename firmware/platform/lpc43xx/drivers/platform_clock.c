@@ -2110,7 +2110,33 @@ ATTR_WEAK clock_source_t platform_determine_primary_clock_source(void) { return 
  * root clock (i.e. which oscillator) is accepted to drive the primary clock
  * source.
  */
-ATTR_WEAK clock_source_t platform_determine_primary_clock_input(void) { return CLOCK_SOURCE_XTAL_OSCILLATOR; }
+ATTR_WEAK clock_source_t platform_determine_primary_clock_input(void)
+{
+	return CLOCK_SOURCE_XTAL_OSCILLATOR;
+}
+
+/**
+ * Heuristic method that returns a cleaned-up clock frequency. Attempts to provide a nominal frequency
+ * when it makes sense-- mainly, when our measurement accuracy leads to errors greater than our deviation
+ * from the clock's nominal frequency.
+ */
+static uint32_t platform_get_clean_clock_frequency(platform_clock_source_configuration_t *config)
+{
+	// For now, allow ~6.25% error. This should be replaced by a better heuristic for measurement
+	// accuracy in the future.
+	uint32_t allowable_error = config->frequency >> 4;
+
+	uint32_t allowable_min = config->frequency - allowable_error;
+	uint32_t allowable_max = config->frequency + allowable_error;
+
+	// If we're within the allowable error, return the nominal frequency.
+	if ((config->frequency_actual >= allowable_min) && (config->frequency_actual <= allowable_max)) {
+		return config->frequency;
+	} else {
+		return config->frequency_actual;
+	}
+}
+
 
 /**
  * @returns the frequency of the given clock source, in Hz.
@@ -2145,7 +2171,7 @@ static uint32_t platform_get_clock_source_frequency(clock_source_t source)
 	}
 
 	// Return the final actual frequency for the given source.
-	return config->frequency_actual;
+	return platform_get_clean_clock_frequency(config);
 }
 
 /**

@@ -61,7 +61,7 @@ void platform_scu_configure_pin_gpio(uint8_t group, uint8_t pin, uint8_t functio
  * @param group The SCU group for the pin to be configured. This is the first number, X, in the LPC PX_Y naming scheme.
  * @param pin The SCU pin number for the pin to be configured. This is the second number, Y, in the
  * 		LPC PX_Y naming scheme.
- * @param function The function numberto set the given pin to.
+ * @param function The function number to set the given pin to.
  * @param resistors The type of pull resistors to apply.
  */
 void platform_scu_configure_pin_fast_io(uint8_t group, uint8_t pin, uint8_t function,

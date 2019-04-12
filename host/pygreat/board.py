@@ -371,7 +371,7 @@ class GreatBoard(object):
         """
 
         if not self.supports_api('debug'):
-            return "The connected board doesn't suppor the debug API. This usually isn't right."
+            return "The connected board doesn't support the debug API. This usually isn't right."
 
         # Determine which command we should use to read the debug ring, and then use it.
         command = self.apis.debug.clear_dmesg if clear else self.apis.debug.read_dmesg
