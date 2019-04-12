@@ -17,6 +17,7 @@
  */
 #define ATTR_PACKED       __attribute__((packed))
 #define ATTR_ALIGNED(x)	  __attribute__((aligned(x)))  //FIXME: use alignas?
+#define ATTR_WORD_ALIGNED __attribute__((packed,aligned(4)))
 #define ATTR_SECTION(x)   __attribute__((section(x)))
 #define ATTR_WEAK         __attribute__((weak))
 #define ATTR_NORETURN     __attribute__((noreturn))
@@ -67,6 +68,9 @@
 #define ASSERT_OFFSET(structure, member, offset) \
 	static_assert(offsetof(structure, member) == offset, #member " is not at offset " #offset " in struct " #structure)
 
+// Slightly-horrific hack that causes a compiler to emit an error message with a given offset at compile time.
+// Useful for debugging failed ASSERT_OFFSET, but otherwise you should never use this macro.
+#define ERROR_MESSAGE_WITH_OFFSET(structure, member) char (*_failure)[offsetof(structure, member )] = 1;
 
 #define _CONCAT_TOKENS(a, b)   a##b
 #define _CONCAT(a, b) _CONCAT_TOKENS(a, b)
@@ -77,6 +81,39 @@
 #define RESERVED_BYTES(n) uint8_t  _CONCAT(reserved, __LINE__) [n]
 #define RESERVED_WORDS(n) uint32_t _CONCAT(reserved, __LINE__)[n]
 
+
+/**
+ * Generic helpers.
+ */
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+#define CONTAINER_OF(ptr, type, member) ({                      \
+        const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
+        (type *)( (char *)__mptr - offsetof(type,member) );})
+#define MIN(a,b) \
+({ __typeof__ (a) _a = (a); \
+   __typeof__ (b) _b = (b); \
+ _a < _b ? _a : _b; })
+
+
+/**
+ * @returns the "order" (log2) of a binary-sized buffer
+ */
+static inline uint8_t size_to_order(uint32_t size)
+{
+	return 31 - __builtin_clz(size);
+}
+
+/**
+ * @returns true iff the given buffer is binary sized
+ */
+static inline bool is_binary_sized(uint32_t size)
+{
+	return (size == (1UL << size_to_order(size)));
+}
+
+
+
+
 #ifdef __clang__
 #include <toolchain_clang.h>
 #endif
@@ -84,5 +121,9 @@
 #ifdef __GNUC__
 #include <toolchain_gcc.h>
 #endif
+
+
+
+
 
 #endif

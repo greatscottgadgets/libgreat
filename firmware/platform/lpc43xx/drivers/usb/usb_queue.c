@@ -238,11 +238,14 @@ static void usb_queue_clean_up_transfers(usb_endpoint_t const * endpoint, bool i
 						break;
 					} else {
 						// TODO: abstract me
-						int number = endpoint->address & 0x7f;
-						const char *direction = endpoint->address & 0x80 ? "IN" : "OUT";
+						// If the endpoint is still active, print an informational notice.
+						if (usb_endpoint_enabled(endpoint)) {
+							int number = endpoint->address & 0x7f;
+							const char *direction = endpoint->address & 0x80 ? "IN" : "OUT";
 
-						pr_info("usb stack: discarding an active transcation on EP%d:%s!\n", number, direction);
-						pr_info("usb stack: (discard was likely due to overriding SETUP or STALL)\n");
+							pr_info("usb stack: discarding an active transcation on EP%d:%s!\n", number, direction);
+							pr_info("usb stack: (discard was likely due to overriding SETUP or STALL)\n");
+						}
 					}
 				}
 

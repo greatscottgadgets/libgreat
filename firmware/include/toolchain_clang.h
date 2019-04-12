@@ -10,6 +10,7 @@
 #ifndef PRIu32
 #define PRIu32 "u"
 #define PRIx32 "x"
+#define PRIu8  "hhu"
 #endif
 
 #endif

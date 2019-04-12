@@ -247,6 +247,30 @@ static void usb_endpoint_clear_pending_interrupts(
 
 }
 
+// FIXME: this is copy-pasted to maintain consistency; there's a replacement version in the new USB stack
+bool usb_endpoint_enabled(const usb_endpoint_t* const endpoint)
+{
+	const uint_fast8_t endpoint_number = usb_endpoint_number(endpoint->address);
+
+	if(endpoint->device->controller == 0) {
+		if( usb_endpoint_is_in(endpoint->address) ) {
+			return (USB0_ENDPTCTRL(endpoint_number) & USB0_ENDPTCTRL_TXE);
+		} else {
+			return (USB0_ENDPTCTRL(endpoint_number) & USB0_ENDPTCTRL_RXE);
+		}
+	}
+	if(endpoint->device->controller == 1) {
+		if( usb_endpoint_is_in(endpoint->address) ) {
+			return (USB1_ENDPTCTRL(endpoint_number) & USB1_ENDPTCTRL_TXE);
+		} else {
+			return (USB1_ENDPTCTRL(endpoint_number) & USB1_ENDPTCTRL_RXE);
+		}
+	}
+
+	return false;
+}
+
+
 void usb_endpoint_disable(
 	const usb_endpoint_t* const endpoint
 ) {
