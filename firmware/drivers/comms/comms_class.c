@@ -137,7 +137,7 @@ int comms_backend_submit_command(struct comm_backend_driver *backend,
 
 	// If we couldn't find a handling class.
 	if (!handling_class) {
-		pr_warning("comms: backend %s submitted a command for an unknown class %d (%x)\n",
+		pr_warning("comms: backend %s submitted a command for an unknown class %" PRIu32 " (%" PRIx32 ")\n",
 				backend->name, trans->class_number, trans->class_number);
 		return EINVAL;
 	}
@@ -171,7 +171,7 @@ int comms_backend_submit_command(struct comm_backend_driver *backend,
 
 	// If we couldn't find any handler, abort.
 	if (!found_handler) {
-		pr_warning("comms: backend %s submttied a command class %s with an unhandled verb %d / %x\n",
+		pr_warning("comms: backend %s submttied a command class %s with an unhandled verb %" PRIu32 " / %" PRIx32 "\n",
 				backend->name, handling_class->name, trans->verb, trans->verb);
 		return EINVAL;
 	}

@@ -42,7 +42,7 @@
 		type value = *target; \
 		\
 		if (sizeof(type) > trans->data_in_remaining) { \
-			pr_comms_error(trans, "not enough data provided to read %s response (%d byte(s) left)\n", #type, \
+			pr_comms_error(trans, "not enough data provided to read %s response (%" PRIu32 " byte(s) left)\n", #type, \
 					trans->data_in_remaining); \
 			trans->data_in_status |= COMMS_PARSE_UNDERRUN; \
 			return (type)0; \
@@ -147,7 +147,7 @@ void *comms_response_reserve_space(struct command_transaction *trans, uint32_t s
 	uint32_t available_length = trans->data_out_max_length - trans->data_out_length;
 
 	if (size > available_length) {
-		pr_comms_error(trans, "not enough space to reserve %d requested bytes\n", size);
+		pr_comms_error(trans, "not enough space to reserve %" PRIu32 " requested bytes\n", size);
 		trans->data_out_status = COMMS_PARSE_OVERRUN;
 		return NULL;
 	}
