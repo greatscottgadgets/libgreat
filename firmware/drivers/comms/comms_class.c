@@ -146,7 +146,7 @@ int comms_backend_submit_command(struct comm_backend_driver *backend,
 	// Error out.
 	if (!handling_class->command_verbs && !handling_class->command_handler) {
 		pr_warning(
-				"comms: backend %s submttied a command for class %d, which has neither\n"
+				"comms: backend %s submttied a command for class %s, which has neither\n"
 				"a command handler nor verb handlers!\n",
 				backend->name, handling_class->name);
 		return EINVAL;
