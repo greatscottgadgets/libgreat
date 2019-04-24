@@ -8,20 +8,21 @@ def read(fname):
 
 
 setup_req = []
-version_format = None
-version = None
+setup_options = {}
 
 # Deduce version, if possible.
 if os.path.isfile('../VERSION'):
-    version = read('../VERSION')
+    setup_options['version'] = read('../VERSION').strip()
 else:
-    version_format = '{tag}.dev{commitcount}+git.{gitsha}'
-    setup_req.append('setuptools-git-version')
+    setup_options['version_config'] =  {
+        "version_format": '{tag}.dev{commitcount}+git.{gitsha}',
+        "starting_version": "2019.05.01"
+    }
+    setup_req.append('better-setuptools-git-version')
+
 
 setup(
     name='pygreat',
-    version=version,
-    version_format=version_format,
     setup_requires=setup_req,
     url='https://greatscottgadgets.com/greatfet/',
     license='BSD',
@@ -50,5 +51,6 @@ setup(
         'Topic :: Scientific/Engineering',
         'Topic :: Security',
         ],
-    extras_require={}
+    extras_require={},
+    **setup_options
 )

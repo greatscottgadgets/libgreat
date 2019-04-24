@@ -41,3 +41,4 @@ firmware/*/build
 
 # release files
 VERSION
+.eggs
