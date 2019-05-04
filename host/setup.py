@@ -10,16 +10,16 @@ def read(fname):
 setup_req = []
 setup_options = {}
 
+
 # Deduce version, if possible.
 if os.path.isfile('../VERSION'):
     setup_options['version'] = read('../VERSION').strip()
 else:
     setup_options['version_config'] =  {
-        "version_format": '{tag}.dev{commitcount}+git.{gitsha}',
+        "version_format": '{tag}.dev+git.{sha}',
         "starting_version": "2019.05.01"
     }
     setup_req.append('better-setuptools-git-version')
-
 
 setup(
     name='pygreat',
