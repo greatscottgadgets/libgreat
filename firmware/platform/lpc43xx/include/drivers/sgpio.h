@@ -414,6 +414,8 @@ typedef enum {
 	// Mode for streaming data
 
 	// Uses a single SGPIO slice to generate a clock on a single SGPIO pin.
+	// Note that this is _not_ the mode to use if you want to output the clock from an existing slice -- this
+	// is for generating an entirely new clock.
 	SGPIO_MODE_CLOCK_GENERATION,
 
 	// TODO: other functions?
@@ -478,6 +480,11 @@ typedef struct {
 	// Used for the data stream modes. See `sgpio_clock_qualifier_t` for more information.
 	sgpio_clock_qualifier_t shift_clock_qualifier;
 	bool shift_clock_qualifier_is_active_low;
+
+	// If desired, we can output any _generated_ shift clock on one of the unused SGPIO pins.
+	// This specifies the pin on which the shift clock should be output. Provide NULL if output is not desired.
+	// This value is meaningless if .shift_clock_source is not a local counter.
+	sgpio_pin_configuration_t *shift_clock_output;
 
 	// Circular buffer that will contain the -packed- binary data to be scanned in or out.
 	// Must be sized to a power of two -- and the size is stored as an order -- that is, as the log2() of the size.

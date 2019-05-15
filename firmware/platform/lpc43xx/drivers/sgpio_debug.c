@@ -16,6 +16,7 @@
 // Private "imports" from sgpio.c/sgpio_isr.c.
 int sgpio_slice_for_io(uint8_t pin);
 int sgpio_io_pin_for_slice(uint8_t slice);
+int sgpio_slice_for_clockgen(uint8_t pin);
 bool sgpio_isr_necessary_for_function(sgpio_function_t *function);
 
 
@@ -122,69 +123,75 @@ void sgpio_dump_pin_configuration(loglevel_t loglevel, sgpio_t *sgpio, uint8_t p
 	if (output_config->pin_direction_source == SGPIO_USE_PIN_DIRECTION_REGISTER) {
 		bool is_out = sgpio->reg->sgpio_pin_direction & (1 << pin);
 		printk(continued, is_out ? " OUTPUT" : " INPUT ");
+
+		if (is_out) {
+
+			// Print the output bus mode.
+			printk(continued, "   mode: ");
+			switch (output_config->output_bus_mode) {
+				case SGPIO_OUTPUT_MODE_1BIT:      printk(continued, "1-bit  "); break;
+				case SGPIO_OUTPUT_MODE_2BIT_A:    printk(continued, "2-bit A"); break;
+				case SGPIO_OUTPUT_MODE_2BIT_B:    printk(continued, "2-bit B"); break;
+				case SGPIO_OUTPUT_MODE_2BIT_C:    printk(continued, "2-bit C"); break;
+				case SGPIO_OUTPUT_MODE_4BIT_A:    printk(continued, "4-bit A"); break;
+				case SGPIO_OUTPUT_MODE_4BIT_B:    printk(continued, "4-bit B"); break;
+				case SGPIO_OUTPUT_MODE_4BIT_C:    printk(continued, "4-bit C"); break;
+				case SGPIO_OUTPUT_MODE_8BIT_A:    printk(continued, "8-bit A"); break;
+				case SGPIO_OUTPUT_MODE_8BIT_B:    printk(continued, "8-bit B"); break;
+				case SGPIO_OUTPUT_MODE_8BIT_C:    printk(continued, "8-bit C"); break;
+				case SGPIO_OUTPUT_MODE_GPIO:      printk(continued, "GPIO   "); break;
+				case SGPIO_OUTPUT_MODE_CLOCK_OUT: printk(continued, "CLKOUT "); break;
+			}
+
+			// Print the source of the binary values to be output on the relevant pin.
+			printk(continued, "   source: ");
+			switch (output_config->output_bus_mode) {
+
+				// In the 1-bit modes, or any of the A modes, the output source comes directly from the pin's I/O slice.
+				case SGPIO_OUTPUT_MODE_1BIT:
+				case SGPIO_OUTPUT_MODE_2BIT_A:
+				case SGPIO_OUTPUT_MODE_4BIT_A:
+				case SGPIO_OUTPUT_MODE_8BIT_A:
+					printk(continued, "%c%u", 'A' + sgpio_io_slice_for_bus_pin(pin, bus_width), position_in_bus);
+					break;
+
+
+				// In the 2C/4C modes, the output source comes from the pin that _feeds_ the pin's I/O slice.
+				case SGPIO_OUTPUT_MODE_2BIT_C:
+				case SGPIO_OUTPUT_MODE_4BIT_C: {
+					uint8_t io_slice = sgpio_io_slice_for_bus_pin(pin, bus_width);
+					printk(continued, "%c%u", 'A' + sgpio_input_slice_for_concatenation(io_slice, bus_width), position_in_bus);
+					break;
+				}
+
+				// Mode 8C has a bit of a quirk: to avoid using the direction registers DHOP, it uses a different slice pattern.
+				// To simplify things, we'll just print these directly.
+				case SGPIO_OUTPUT_MODE_8BIT_C: {
+					char slice = (pin >= 8) ? 'N' : 'L';
+					printk(continued, "%c%u", slice, position_in_bus);
+					break;
+				}
+
+
+				case SGPIO_OUTPUT_MODE_2BIT_B:
+				case SGPIO_OUTPUT_MODE_4BIT_B:
+				case SGPIO_OUTPUT_MODE_8BIT_B:
+					printk(continued, "??");
+					break;
+
+				case SGPIO_OUTPUT_MODE_CLOCK_OUT: {
+					uint8_t io_slice = sgpio_slice_for_clockgen(pin);
+					printk(continued, "%c_clk", 'A' + io_slice);
+					break;
+				}
+			}
+		}
 	}
 	// Otherwise, print that the pin is bidirectional.
 	else {
 		printk(continued, " BIDIR ");
-	}
 
-	// Print the output bus mode.
-	printk(continued, "   mode: ");
-	switch (output_config->output_bus_mode) {
-		case SGPIO_OUTPUT_MODE_1BIT:      printk(continued, "1-bit  "); break;
-		case SGPIO_OUTPUT_MODE_2BIT_A:    printk(continued, "2-bit A"); break;
-		case SGPIO_OUTPUT_MODE_2BIT_B:    printk(continued, "2-bit B"); break;
-		case SGPIO_OUTPUT_MODE_2BIT_C:    printk(continued, "2-bit C"); break;
-		case SGPIO_OUTPUT_MODE_4BIT_A:    printk(continued, "4-bit A"); break;
-		case SGPIO_OUTPUT_MODE_4BIT_B:    printk(continued, "4-bit B"); break;
-		case SGPIO_OUTPUT_MODE_4BIT_C:    printk(continued, "4-bit C"); break;
-		case SGPIO_OUTPUT_MODE_8BIT_A:    printk(continued, "8-bit A"); break;
-		case SGPIO_OUTPUT_MODE_8BIT_B:    printk(continued, "8-bit B"); break;
-		case SGPIO_OUTPUT_MODE_8BIT_C:    printk(continued, "8-bit C"); break;
-		case SGPIO_OUTPUT_MODE_GPIO:      printk(continued, "GPIO   "); break;
-		case SGPIO_OUTPUT_MODE_CLOCK_OUT: printk(continued, "CLKOUT "); break;
-	}
-
-	// Print the source of the binary values to be output on the relevant pin.
-	printk(continued, "   source: ");
-	switch (output_config->output_bus_mode) {
-
-		// In the 1-bit modes, or any of the A modes, the output source comes directly from the pin's I/O slice.
-		case SGPIO_OUTPUT_MODE_1BIT:
-		case SGPIO_OUTPUT_MODE_2BIT_A:
-		case SGPIO_OUTPUT_MODE_4BIT_A:
-		case SGPIO_OUTPUT_MODE_8BIT_A:
-			printk(continued, "%c%u", 'A' + sgpio_io_slice_for_bus_pin(pin, bus_width), position_in_bus);
-			break;
-
-
-		// In the 2C/4C modes, the output source comes from the pin that _feeds_ the pin's I/O slice.
-		case SGPIO_OUTPUT_MODE_2BIT_C:
-		case SGPIO_OUTPUT_MODE_4BIT_C: {
-			uint8_t io_slice = sgpio_io_slice_for_bus_pin(pin, bus_width);
-			printk(continued, "%c%u", 'A' + sgpio_input_slice_for_concatenation(io_slice, bus_width), position_in_bus);
-			break;
-		}
-
-		// Mode 8C has a bit of a quirk: to avoid using the direction registers DHOP, it uses a different slice pattern.
-		// To simplify things, we'll just print these directly.
-		case SGPIO_OUTPUT_MODE_8BIT_C: {
-			char slice = (pin >= 8) ? 'N' : 'L';
-			printk(continued, "%c%u", slice, position_in_bus);
-			break;
-		}
-
-
-		case SGPIO_OUTPUT_MODE_2BIT_B:
-		case SGPIO_OUTPUT_MODE_4BIT_B:
-		case SGPIO_OUTPUT_MODE_8BIT_B:
-			printk(continued, "??");
-			break;
-	}
-
-
-	// If our direction source isn't the pin direction register, print the source.
-	if (output_config->pin_direction_source != SGPIO_USE_PIN_DIRECTION_REGISTER) {
+		// If our direction source isn't the pin direction register, print the source.
 		bool is_first_pin = (pin % sgpio_bus_width_for_output_mode(output_config->pin_direction_source)) == 0;
 
 		printk(continued, "   direction source: ");

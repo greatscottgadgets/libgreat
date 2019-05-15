@@ -5,17 +5,20 @@
  */
 
 #include <stdbool.h>
+#include <toolchain.h>
 
 #ifndef __LIBGREAT_GPIO_H__
 #define __LIBGREAT_GPIO_H__
 
 #include <drivers/platform_gpio.h>
 
+
+
 /**
  * Configures the system's pinmux to route the given GPIO
- * pin to a physical pin. 
+ * pin to a physical pin.
  */
-int gpio_configure_pinmux(uint8_t port, uint8_t pin);
+int gpio_configure_pinmux(gpio_pin_t pin);
 
 
 /**
@@ -51,7 +54,7 @@ uint32_t gpio_get_port_direction(uint8_t port);
  * @param port The number of the port to be configured.
  * @param pin The number of the pin to be configured.
  */
-int gpio_set_pin_direction(uint8_t port, uint8_t pin, bool is_output);
+int gpio_set_pin_direction(gpio_pin_t pin, bool is_output);
 
 
 /**
@@ -60,7 +63,7 @@ int gpio_set_pin_direction(uint8_t port, uint8_t pin, bool is_output);
  * @param port The number of the port to be configured.
  * @return A word with a 1 set for each pin that's an output, and a zero for each input.
  */
-uint32_t gpio_get_pin_direction(uint8_t port, uint8_t pin);
+uint32_t gpio_get_pin_direction(gpio_pin_t pin);
 
 
 
@@ -117,34 +120,25 @@ uint32_t gpio_get_port_value(uint8_t port, uint32_t mask);
  * @param pin The number of the pin to be configured.
  * @param value 0 to clear the given pin, or any other value to set it.
  */
-int gpio_set_pin_value(uint8_t port, uint8_t pin, uint8_t value);
+int gpio_set_pin_value(gpio_pin_t pin, uint8_t value);
 
 
 /**
  * Sets a given GPIO to output 1/high.
- *
- * @param port The number of the port to be set.
- * @param pin The number of the pin to be set.
  */
-int gpio_set_pin(uint8_t port, uint8_t pin);
+int gpio_set_pin(gpio_pin_t pin);
 
 
 /**
  * Sets a given GPIO to output 0/low.
- *
- * @param port The number of the port to be cleared.
- * @param pin The number of the pin to be cleared.
  */
-int gpio_clear_pin(uint8_t port, uint8_t pin);
+int gpio_clear_pin(gpio_pin_t pin);
 
 
 /**
  * Toggles a given GPIO pin's value.
- *
- * @param port The number of the port to be toggled.
- * @param pin The number of the pin to be toggled.
  */
-int gpio_toggle_pin(uint8_t port, uint8_t pin);
+int gpio_toggle_pin(gpio_pin_t pin);
 
 
 /**
@@ -154,6 +148,6 @@ int gpio_toggle_pin(uint8_t port, uint8_t pin);
  * @param pin The number of the pin to be read.
  * @return 0 for a logic low, or 1 for a logic high
  */
-uint8_t gpio_get_pin_value(uint8_t port, uint8_t pin);
+uint8_t gpio_get_pin_value(gpio_pin_t pin);
 
 #endif // __LIBGREAT_GPIO_H__

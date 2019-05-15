@@ -48,15 +48,15 @@ int ad970x_initialize(ad970x_t *dac, uint32_t clock_period)
 	}
 
 	// Set the SCK and CS pins to output only, as we'll maintain control over these.
-	gpio_set_pin_direction(dac->gpio_port_cs,  dac->gpio_pin_cs, true);
-	gpio_set_pin_direction(dac->gpio_port_sck, dac->gpio_pin_sck, true);
+	gpio_set_pin_direction(dac->gpio_cs,  true);
+	gpio_set_pin_direction(dac->gpio_sck, true);
 
 	// We'll start by driving the data line; and release it when we need to.
-	gpio_set_pin_direction(dac->gpio_port_data, dac->gpio_pin_data, true);
+	gpio_set_pin_direction(dac->gpio_data, true);
 
 	// Keep the DAC in SPI mode, for now.
-	gpio_set_pin_direction(dac->gpio_port_mode, dac->gpio_pin_mode, true);
-	gpio_clear_pin(dac->gpio_port_mode, dac->gpio_pin_mode);
+	gpio_set_pin_direction(dac->gpio_mode, true);
+	gpio_clear_pin(dac->gpio_mode);
 
 	return 0;
 }
@@ -66,7 +66,7 @@ int ad970x_initialize(ad970x_t *dac, uint32_t clock_period)
  */
 static void dac_set_sck_high(ad970x_t *dac)
 {
-	gpio_set_pin(dac->gpio_port_sck, dac->gpio_pin_sck);
+	gpio_set_pin(dac->gpio_sck);
 }
 
 /**
@@ -74,7 +74,7 @@ static void dac_set_sck_high(ad970x_t *dac)
  */
 static void dac_set_sck_low(ad970x_t *dac)
 {
-	gpio_clear_pin(dac->gpio_port_sck, dac->gpio_pin_sck);
+	gpio_clear_pin(dac->gpio_sck);
 }
 
 /**
@@ -82,7 +82,7 @@ static void dac_set_sck_low(ad970x_t *dac)
  */
 static uint8_t dac_read_data_state(ad970x_t *dac)
 {
-	return gpio_get_pin_value(dac->gpio_port_data, dac->gpio_pin_data);
+	return gpio_get_pin_value(dac->gpio_data);
 }
 
 /**
@@ -90,7 +90,7 @@ static uint8_t dac_read_data_state(ad970x_t *dac)
  */
 static void dac_set_data_state(ad970x_t *dac, uint8_t value)
 {
-	gpio_set_pin_value(dac->gpio_port_data, dac->gpio_pin_data, value);
+	gpio_set_pin_value(dac->gpio_data, value);
 }
 
 /**
@@ -108,7 +108,7 @@ static void dac_wait_for_half_period(ad970x_t *dac)
  */
 static void dac_drive_data_line(ad970x_t *dac)
 {
-	gpio_set_pin_direction(dac->gpio_port_data, dac->gpio_pin_data, true);
+	gpio_set_pin_direction(dac->gpio_data, true);
 	dac_wait_for_half_period(dac);
 }
 
@@ -118,7 +118,7 @@ static void dac_drive_data_line(ad970x_t *dac)
  */
 static void dac_release_data_line(ad970x_t *dac)
 {
-	gpio_set_pin_direction(dac->gpio_port_data, dac->gpio_pin_data, false);
+	gpio_set_pin_direction(dac->gpio_data, false);
 	dac_wait_for_half_period(dac);
 }
 
@@ -167,7 +167,7 @@ static void dac_send_bit(ad970x_t *dac, uint8_t value)
 static void dac_start_config_transaction(ad970x_t *dac)
 {
 	// Clear CS, and wait a bit to meet timing requirements.
-	gpio_clear_pin(dac->gpio_port_cs, dac->gpio_pin_cs);
+	gpio_clear_pin(dac->gpio_cs);
 	dac_wait_for_half_period(dac);
 }
 
@@ -178,7 +178,7 @@ static void dac_start_config_transaction(ad970x_t *dac)
 static void dac_end_config_transaction(ad970x_t *dac)
 {
 	// Put the system back into its idle state (CS high, SCK low).
-	gpio_set_pin(dac->gpio_port_cs, dac->gpio_pin_cs);
+	gpio_set_pin(dac->gpio_cs);
 	dac_set_sck_low(dac);
 
 	// Block for half a period to meet timing requirements.

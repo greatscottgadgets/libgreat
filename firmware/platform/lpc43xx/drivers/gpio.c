@@ -77,14 +77,14 @@ static int validate_port(uint8_t port)
  *
  * @return 0 on success, or an error code on failures
  */
-static int validate_port_and_pin(uint8_t port, uint8_t pin)
+static int validate_port_and_pin(gpio_pin_t pin)
 {
-	if (validate_port(port) != 0) {
+	if (validate_port(pin.port) != 0) {
 		return EINVAL;
 	}
 
-	if (port > GPIO_MAX_PORT_BITS) {
-		pr_warning("gpio: requested a non-existent pin (port %d, pin %d)\n", port, pin);
+	if (pin.port > GPIO_MAX_PORT_BITS) {
+		pr_warning("gpio: requested a non-existent pin (port %u, pin %u)\n", pin.port, pin.pin);
 		return EINVAL;
 	}
 
@@ -104,12 +104,12 @@ static struct gpio_registers *gpio_get_registers(uint8_t port)
 /**
  * Gets a reference to the GPIO register block for the given port.
  */
-static uint32_t *gpio_get_pin_register(uint8_t port, uint8_t pin)
+static uint32_t *gpio_get_pin_register(gpio_pin_t pin)
 {
 	uintptr_t pin_address =
 		(GPIO_LPC_BASE + GPIO_LPC_PIN_WORD_OFFSET) + // Offset of the pin-word region
-		(port * GPIO_LPC_PIN_WORD_SIZE) +  // Offset of the given port in the pin-word region
-		(pin * sizeof(uint32_t)); // Offset of the pin in the port in the pin-word region
+		(pin.port * GPIO_LPC_PIN_WORD_SIZE) +  // Offset of the given port in the pin-word region
+		(pin.pin * sizeof(uint32_t)); // Offset of the pin in the port in the pin-word region
 
 	return (uint32_t*)pin_address;
 }
@@ -404,26 +404,26 @@ static const uint8_t gpio_to_pin_number[GPIO_MAX_PORTS][GPIO_MAX_PORT_BITS] = {
 /**
  * Returns the SCU group number for the given GPIO bit.
  */
-uint8_t gpio_get_group_number(uint8_t port, uint8_t pin)
+uint8_t gpio_get_group_number(gpio_pin_t pin)
 {
-	if (validate_port_and_pin(port, pin) != 0) {
+	if (validate_port_and_pin(pin) != 0) {
 		return -1;
 	}
 
-	return gpio_to_pin_group[port][pin];
+	return gpio_to_pin_group[pin.port][pin.pin];
 }
 
 
 /**
  * Returns the SCU pin number for the given GPIO bit.
  */
-uint8_t gpio_get_pin_number(uint8_t port, uint8_t pin)
+uint8_t gpio_get_pin_number(gpio_pin_t pin)
 {
-	if (validate_port_and_pin(port, pin) != 0) {
+	if (validate_port_and_pin(pin) != 0) {
 		return -1;
 	}
 
-	return gpio_to_pin_number[port][pin];
+	return gpio_to_pin_number[pin.port][pin.pin];
 }
 
 
@@ -432,18 +432,18 @@ uint8_t gpio_get_pin_number(uint8_t port, uint8_t pin)
  * Configures the system's pinmux to route the given GPIO
  * pin to a physical pin.
  */
-int gpio_configure_pinmux(uint8_t port, uint8_t pin)
+int gpio_configure_pinmux(gpio_pin_t pin)
 {
 	uint32_t scu_function;
 	uint8_t scu_group, scu_pin;
 
-	if (validate_port_and_pin(port, pin)) {
+	if (validate_port_and_pin(pin)) {
 		return EINVAL;
 	}
 
 	// Get the SCU group/pin so we can pinmux.
-	scu_group = gpio_get_group_number(port, pin);
-	scu_pin   = gpio_get_pin_number(port, pin);
+	scu_group = gpio_get_group_number(pin);
+	scu_pin   = gpio_get_pin_number(pin);
 
 	// If this port/pin doesn't correspond to a valid physical pin,
 	// fail out.
@@ -452,7 +452,7 @@ int gpio_configure_pinmux(uint8_t port, uint8_t pin)
 	}
 
 	// Select the pinmux function to apply.
-	scu_function = (port == 5) ? 4 : 0;
+	scu_function = (pin.port == 5) ? 4 : 0;
 
 	// Finally, configure the SCU.
 	platform_scu_configure_pin_gpio(scu_group, scu_pin, scu_function, SCU_NO_PULL);
@@ -473,7 +473,7 @@ int gpio_configure_port_pinmuxes(uint8_t port)
 	// Try to configure every possible pin, trusting our
 	// lower-level logic to reject any pin that can't be routed.
 	for (int pin = 0; pin < GPIO_MAX_PORT_BITS; ++pin) {
-		gpio_configure_pinmux(port, pin);
+		gpio_configure_pinmux(gpio_pin(port, pin));
 	}
 
 	return 0;
@@ -533,15 +533,15 @@ uint32_t gpio_get_port_direction(uint8_t port)
  * @param port The number of the port to be configured.
  * @return A word with a 1 set for each pin that's an output, and a zero for each input.
  */
-uint32_t gpio_get_pin_direction(uint8_t port, uint8_t pin)
+uint32_t gpio_get_pin_direction(gpio_pin_t pin)
 {
-	uint32_t pins = gpio_get_port_direction(port);
+	uint32_t pins = gpio_get_port_direction(pin.port);
 
-	if (validate_port_and_pin(port, pin) != 0) {
+	if (validate_port_and_pin(pin) != 0) {
 		return 0;
 	}
 
-	return (pins >> pin) & 1;
+	return (pins >> pin.pin) & 1;
 }
 
 
@@ -551,15 +551,15 @@ uint32_t gpio_get_pin_direction(uint8_t port, uint8_t pin)
  * @param port The number of the port to be configured.
  * @param pin The number of the pin to be configured.
  */
-int gpio_set_pin_direction(uint8_t port, uint8_t pin, bool is_output)
+int gpio_set_pin_direction(gpio_pin_t pin, bool is_output)
 {
-	uint32_t mask = 1 << pin;
+	uint32_t mask = 1 << pin.pin;
 
-	if (validate_port_and_pin(port, pin) != 0) {
+	if (validate_port_and_pin(pin) != 0) {
 		return EINVAL;
 	}
 
-	return gpio_set_port_direction(port, mask, is_output ? mask : 0);
+	return gpio_set_port_direction(pin.port, mask, is_output ? mask : 0);
 }
 
 
@@ -673,11 +673,11 @@ uint32_t gpio_get_port_value(uint8_t port, uint32_t mask)
  * @param pin The number of the pin to be configured.
  * @param value 0 to clear the given pin, or any other value to set it.
  */
-int gpio_set_pin_value(uint8_t port, uint8_t pin, uint8_t value)
+int gpio_set_pin_value(gpio_pin_t pin, uint8_t value)
 {
-	uint32_t *pin_reg = gpio_get_pin_register(port, pin);
+	uint32_t *pin_reg = gpio_get_pin_register(pin);
 
-	if (validate_port_and_pin(port, pin) != 0) {
+	if (validate_port_and_pin(pin) != 0) {
 		return EINVAL;
 	}
 
@@ -693,13 +693,13 @@ int gpio_set_pin_value(uint8_t port, uint8_t pin, uint8_t value)
  * @param pin The number of the pin to be configured.
  * @param value 0 to clear the given pin, or any other value to set it.
  */
-int gpio_set_pin(uint8_t port, uint8_t pin)
+int gpio_set_pin(gpio_pin_t pin)
 {
-	if (validate_port_and_pin(port, pin) != 0) {
+	if (validate_port_and_pin(pin) != 0) {
 		return EINVAL;
 	}
 
-	gpio_set_port_bits(port, 1 << pin);
+	gpio_set_port_bits(pin.port, 1 << pin.pin);
 	return 0;
 }
 
@@ -711,13 +711,13 @@ int gpio_set_pin(uint8_t port, uint8_t pin)
  * @param pin The number of the pin to be configured.
  * @param value 0 to clear the given pin, or any other value to set it.
  */
-int gpio_clear_pin(uint8_t port, uint8_t pin)
+int gpio_clear_pin(gpio_pin_t pin)
 {
-	if (validate_port_and_pin(port, pin) != 0) {
+	if (validate_port_and_pin(pin) != 0) {
 		return EINVAL;
 	}
 
-	gpio_clear_port_bits(port, 1 << pin);
+	gpio_clear_port_bits(pin.port, 1 << pin.pin);
 	return 0;
 }
 
@@ -729,13 +729,13 @@ int gpio_clear_pin(uint8_t port, uint8_t pin)
  * @param pin The number of the pin to be configured.
  * @param value 0 to clear the given pin, or any other value to set it.
  */
-int gpio_toggle_pin(uint8_t port, uint8_t pin)
+int gpio_toggle_pin(gpio_pin_t pin)
 {
-	if (validate_port_and_pin(port, pin) != 0) {
+	if (validate_port_and_pin(pin) != 0) {
 		return EINVAL;
 	}
 
-	gpio_toggle_port_bits(port, 1 << pin);
+	gpio_toggle_port_bits(pin.port, 1 << pin.pin);
 	return 0;
 }
 
@@ -746,11 +746,11 @@ int gpio_toggle_pin(uint8_t port, uint8_t pin)
  * @param pin The number of the pin to be configured.
  * @return 0 for a logic low, or 1 for a logic high
  */
-uint8_t gpio_get_pin_value(uint8_t port, uint8_t pin)
+uint8_t gpio_get_pin_value(gpio_pin_t pin)
 {
-	uint32_t *pin_reg = gpio_get_pin_register(port, pin);
+	uint32_t *pin_reg = gpio_get_pin_register(pin);
 
-	if (validate_port_and_pin(port, pin) != 0) {
+	if (validate_port_and_pin(pin) != 0) {
 		return EINVAL;
 	}
 

@@ -15,7 +15,7 @@
 #include <drivers/platform_clock.h>
 #include <drivers/arm_vectors.h>
 
-//#define pr_debug pr_info
+#define pr_debug pr_info
 
 // FIXME: handle branch clock frequency changes by providing a _handle_clock_frequency_change callback!
 
@@ -205,7 +205,7 @@ int sgpio_io_pin_for_slice(uint8_t slice)
 }
 
 
-static int sgpio_slice_for_clockgen(uint8_t pin)
+int sgpio_slice_for_clockgen(uint8_t pin)
 {
 	const uint8_t clockgen_slice_mappings[] = {
 		SGPIO_SLICE_B, SGPIO_SLICE_D, SGPIO_SLICE_E, SGPIO_SLICE_H,
@@ -568,7 +568,12 @@ static uint8_t sgpio_maximum_useful_buffer_depth_for_function(sgpio_function_t *
 	}
 }
 
-
+/**
+ * Attempts to optimize SGPIO buffer size by doubling the relevant function's buffer into any nearby,
+ * unused slices.
+ *
+ * //TODO: We should avoid doubling into a slice that wants to be used as an output clock, if possible.
+ */
 bool sgpio_attempt_to_double_buffer_size(sgpio_t *sgpio, sgpio_function_t *function)
 {
 	// Figure out the current configuration order.
@@ -707,11 +712,97 @@ static uint32_t sgpio_output_mode_for_output_buffer(uint8_t bus_width)
 	return SGPIO_OUTPUT_MODE_GPIO;
 }
 
+/**
+ * Configures a single pin to be a clock output.
+ */
+static int sgpio_set_pin_to_clkout_mode(sgpio_t *sgpio, sgpio_pin_configuration_t *pin_config)
+{
+	int rc;
+
+	uint8_t clk_pin = pin_config->sgpio_pin;
+	volatile sgpio_output_config_register_t *config = &sgpio->reg->output_configuration[clk_pin];
+
+	// Ensure the relevant pin is routed to its appropriate locaiton...
+	rc = sgpio_set_up_pin(sgpio, pin_config);
+
+	// Set the relevant pin to to output mode...
+	config->pin_direction_source = SGPIO_USE_PIN_DIRECTION_REGISTER;
+	sgpio->reg->sgpio_pin_direction |= (1 << clk_pin);
+
+	// ... mark the pin as used ...
+	sgpio->pins_in_use |= (1 << clk_pin);
+
+	// ... and output the relevant clock.
+	sgpio->reg->output_configuration[clk_pin].output_bus_mode = SGPIO_OUTPUT_MODE_CLOCK_OUT;
+
+	return rc;
+}
+
+
+/**
+ * Sets up output of a function's shift clock, if desired.
+ */
+static int sgpio_set_up_shift_clock_output(sgpio_t *sgpio, sgpio_function_t *function)
+{
+	uint8_t clk_pin = function->shift_clock_output->sgpio_pin;
+	uint8_t clkgen_slice = sgpio_slice_for_clockgen(clk_pin);
+
+	// Use the divisor from our function's I/O slice as our target divisor.
+	uint32_t target_divisor = sgpio->reg->sgpio_cycles_per_shift_clock[function->io_slice];
+
+	//
+	// Simple case: the relevant pin is already associated with a slice with the correct
+	// frequency. This is lucky and/or good hardware design -- we just need to set the relevant
+	// pin to CLKOUT mode.
+	//
+	bool slice_in_use = sgpio->slices_in_use & (1 << clkgen_slice);
+	bool slice_frequency_matches = (sgpio->reg->sgpio_cycles_per_shift_clock[clkgen_slice] == target_divisor);
+
+	pr_debug("slice usage mask: %08x\n", sgpio->slices_in_use);
+
+	if (slice_in_use && slice_frequency_matches) {
+		pr_debug("sgpio: clkout: slice %c is already in use; and matches our frequency! using directly!\n",
+			'A' + clkgen_slice);
+		sgpio_set_pin_to_clkout_mode(sgpio, function->shift_clock_output);
+		return 0;
+	}
+
+	//
+	// Secondary case: if the relevant slice isn't in use at all, we can configure it to generate the relevant clock.
+	//
+	if (!slice_in_use) {
+		pr_debug("sgpio: clkout: slice %c isn't in use; setting up.\n",
+			'A' + clkgen_slice);
+
+		// Copy the clock properties to our relevant slice...
+		sgpio_copy_slice_properties(sgpio, clkgen_slice, function->io_slice);
+
+		// ... mark it in use ...
+		sgpio->slices_in_use |= (1 << clkgen_slice);
+
+		// ... and then set it into output mode.
+		sgpio_set_pin_to_clkout_mode(sgpio, function->shift_clock_output);
+		return 0;
+	}
+
+	//
+	// TODO: There may be a third case that's workable -- it may be possible to still generate the
+	// relevant clock on a slice if that slice is using an external clock, rather than a local shift clock.
+	//
+	// That may be worth investigating at some point.
+	//
+
+	// We couldn't figure out how to output the relevant clock. Fail out.
+	pr_error("sgpio: constraints: couldn't figure out how to meet all clocking constraints!\n");
+	pr_error("sgpio: constraints: couldn't output a clock on SGPIO%" PRIu32 ".\n", clk_pin);
+	return EBUSY;
+}
+
 
 /**
  * Sets up the SGPIO pins used by the given function to provide any relevant output functionality.
  */
-static void sgpio_set_up_output_pins_for_function(sgpio_t *sgpio, sgpio_function_t *function)
+static int sgpio_set_up_output_pins_for_function(sgpio_t *sgpio, sgpio_function_t *function)
 {
 	// Iterate over each pin relevant to the given function...
 	for (unsigned i = 0; i < function->bus_width; ++i) {
@@ -726,7 +817,7 @@ static void sgpio_set_up_output_pins_for_function(sgpio_t *sgpio, sgpio_function
 			// which uses the sgpio_pin_direction register to select the given pin's direction, and then select Input.
 			case SGPIO_MODE_STREAM_DATA_IN:
 				output_config->pin_direction_source = SGPIO_USE_PIN_DIRECTION_REGISTER;
-				sgpio->reg->sgpio_pin_direction     = ~(1 << pin_number);
+				sgpio->reg->sgpio_pin_direction    &= ~(1 << pin_number);
 				break;
 
 
@@ -744,6 +835,7 @@ static void sgpio_set_up_output_pins_for_function(sgpio_t *sgpio, sgpio_function
 
 
 			// Handle our slice clock generation modes.
+			// FIXME: should this use output_clock instead of our pin-config list?
 			case SGPIO_MODE_CLOCK_GENERATION:
 
 				// Set the relevant pin to output the I/O slice's clock.
@@ -762,16 +854,33 @@ static void sgpio_set_up_output_pins_for_function(sgpio_t *sgpio, sgpio_function
 				break;
 		}
 	}
+
+	// If the user has requested we output the shift clock for this function, try to make that happen.
+	if (function->shift_clock_output) {
+		int rc = sgpio_set_up_shift_clock_output(sgpio, function);
+		if (rc) {
+			return rc;
+		}
+	}
+
+	return 0;
 }
 
 /**
  * Set up any output pins relevant to the given SGPIO block.
  */
-static void sgpio_set_up_output_pins(sgpio_t *sgpio)
+static int sgpio_set_up_output_pins(sgpio_t *sgpio)
 {
+	int rc;
+
 	for (unsigned i = 0; i < sgpio->function_count; ++i) {
-		sgpio_set_up_output_pins_for_function(sgpio, &sgpio->functions[i]);
+		rc = sgpio_set_up_output_pins_for_function(sgpio, &sgpio->functions[i]);
+		if (rc) {
+			return rc;
+		}
 	}
+
+	return 0;
 }
 
 
@@ -807,9 +916,7 @@ int sgpio_set_up_functions(sgpio_t *sgpio)
 		sgpio->reg->output_configuration[i].pin_direction_source = SGPIO_OUTPUT_MODE_GPIO;
 		sgpio->reg->output_configuration[i].pin_direction_source = SGPIO_USE_PIN_DIRECTION_REGISTER;
 	}
-	for (unsigned i = 0; i < SGPIO_NUM_PINS; ++i) {
-		sgpio->reg->sgpio_pin_direction = 0;
-	}
+	sgpio->reg->sgpio_pin_direction = 0;
 
 	// Perform an initial set-up of each of our SGPIO functions.
 	// This sets up each function to perform its function with a minimal amount of used hardware.
@@ -835,7 +942,10 @@ int sgpio_set_up_functions(sgpio_t *sgpio)
 
 	// Set up each pin for any output functions it may serve.
 	pr_debug("sgpio: configuring output pins\n");
-	sgpio_set_up_output_pins(sgpio);
+	rc = sgpio_set_up_output_pins(sgpio);
+	if (rc) {
+		return rc;
+	}
 
 	// Finally, generate the ISR that shuttles data around.
 	pr_debug("sgpio: generating our data-handling ISR\n");
@@ -897,3 +1007,4 @@ void sgpio_halt(sgpio_t *sgpio)
 
 	sgpio->running = false;
 }
+

@@ -18,7 +18,7 @@
 // handlers for multiple different events. This is still a TODO, but it needs to happen soon to maintain this driver's
 // genericism.
 
-#define pr_debug pr_info
+//#define pr_debug pr_info
 
 // Normally, branching is expensive, so we'll try to avoid it. Comment this out to branch past small sets
 // of unused instructions; which is probably slower.
