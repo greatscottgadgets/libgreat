@@ -173,7 +173,7 @@ class GreatBoard(object):
             # A pipe error here likely means the device didn't support a start-up
             # command, and STALLED.
             # We'll interpret that as a "we don't accept this device" by default.
-            if e.errno == LIBUSB_PIPE_ERROR:
+            if e.errno == LIBUSB_PIPE_ERROR or e.errno == None:
                 return False
             else:
                 raise e
