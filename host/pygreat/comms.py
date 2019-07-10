@@ -18,7 +18,10 @@ import collections
 
 from . import errors
 
-from backports.functools_lru_cache import lru_cache as memoize_with_lru_cache
+try:
+    from functools import lru_cache as memoize_with_lru_cache
+except ImportError:
+    from backports.functools_lru_cache import lru_cache as memoize_with_lru_cache
 
 
 class CommsError(IOError):

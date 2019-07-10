@@ -32,7 +32,11 @@ setup(
     author='Katherine J. Temkin',
     author_email='ktemkin@greatscottgadgets.com',
     tests_require=[''],
-    install_requires=['pyusb', 'future', 'backports.functools_lru_cache'],
+    install_requires=[
+        'pyusb',
+        'future',
+        'backports.functools_lru_cache;python_version<"3.3"'
+    ],
     description='Python library for talking with libGreat devices',
     long_description=read('../README.md'),
     packages=find_packages(),
