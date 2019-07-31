@@ -1056,6 +1056,23 @@ uint32_t platform_detect_clock_source_frequency(clock_source_t clock_to_detect)
 
 
 /**
+ @return true iff the given frequency is within a tolerance of its nominal value
+ */
+bool platform_nominal_frequency_within_tolerance(uint32_t frequency_nominal,
+		uint32_t frequency_measured, uint32_t tolerance_percent)
+{
+	float tolerance_max = (100.0 + tolerance_percent) / 100.0;
+	float tolerance_min = (100.0 - tolerance_percent) / 100.0;
+
+	uint32_t max_allowable = tolerance_max * frequency_nominal;
+	uint32_t min_allowable = tolerance_min * frequency_nominal;
+
+	return (frequency_measured <= max_allowable) && (frequency_measured >= min_allowable);
+
+}
+
+
+/**
  * Verifies the frequency of a given clock source; this also sets our
  * known actual frequency for the given source.
  *
