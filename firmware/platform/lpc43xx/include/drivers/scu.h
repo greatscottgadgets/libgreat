@@ -25,11 +25,7 @@ typedef enum {
 	SCU_NO_PULL    = 0b10,
 	SCU_PULLDOWN   = 0b11,
 	SCU_PULLUP     = 0b00,
-
-	// Professionalism.
-	SCU_ON_FIRE    = 0b01,
-	SCU_CHIPWARMER = 0b01,
-
+	SCU_REPEATER   = 0b01,
  } scu_resistor_configuration_t;
 
 

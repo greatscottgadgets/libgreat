@@ -36,7 +36,7 @@ set(DEFINES_BOARD                  ${DEFINES_BOARD} LPC43XX_M4)
 # TODO: make these just the linker scripts, and not the flags
 set(LINKER_SCRIPT_FLASH            libgreat_lpc43xx_rom_to_ram.ld)
 set(LINKER_SCRIPT_DFU              libgreat_lpc43xx.ld)
-set(LINKER_SCRIPTS_SECONDARY_CPU   LPC43xx_M0_memory.ld libopencm3_lpc43xx_m0.ld)
+set(LINKER_SCRIPTS_SECONDARY_CPU   LPC43xx_M0_memory.ld libgreat_lpc43xx_m0.ld)
 
 # Use our Cortex-M toolchain.
 set(CMAKE_TOOLCHAIN_FILE           "${PATH_LIBGREAT}/firmware/cmake/toolchain/arm-cortex-m.cmake")

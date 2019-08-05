@@ -428,11 +428,11 @@ uint8_t gpio_get_pin_number(gpio_pin_t pin)
 
 
 
+
 /**
- * Configures the system's pinmux to route the given GPIO
- * pin to a physical pin.
+ * Configures the system's pinmux to route the given GPIO pin to a physical pin.
  */
-int gpio_configure_pinmux(gpio_pin_t pin)
+int gpio_configure_pinmux_and_resistors(gpio_pin_t pin, gpio_resistor_configuration_t resistor_mode)
 {
 	uint32_t scu_function;
 	uint8_t scu_group, scu_pin;
@@ -455,8 +455,19 @@ int gpio_configure_pinmux(gpio_pin_t pin)
 	scu_function = (pin.port == 5) ? 4 : 0;
 
 	// Finally, configure the SCU.
-	platform_scu_configure_pin_gpio(scu_group, scu_pin, scu_function, SCU_NO_PULL);
+	platform_scu_configure_pin_gpio(scu_group, scu_pin, scu_function, resistor_mode);
 	return 0;
+}
+
+
+
+/**
+ * Configures the system's pinmux to route the given GPIO
+ * pin to a physical pin.
+ */
+int gpio_configure_pinmux(gpio_pin_t pin)
+{
+	gpio_configure_pinmux_and_resistors(pin, SCU_NO_PULL);
 }
 
 
@@ -756,4 +767,27 @@ uint8_t gpio_get_pin_value(gpio_pin_t pin)
 
 	// Use the hardware pin-masking feature to write the given values.
 	return (*pin_reg) ? 1 : 0;
+}
+
+
+/**
+ * Fast method for reading a GPIO pin; intended for tight loops.
+ *
+ * @returns -1 (all 1's) if the bit is high, or 0 if the bit is low
+ */
+uint32_t gpio_fast_get_pin_value(gpio_pin_t pin)
+{
+	return *gpio_get_pin_register(pin);
+}
+
+
+
+/**
+ * LPC43xx specicfic register that grabs a GPIO pin word-access register.
+ *
+ * @returns a register that always contains -1 (all 1's) if the bit is high, or 0 if the bit is low
+ */
+uint32_t *platform_gpio_get_pin_register(gpio_pin_t pin)
+{
+	return gpio_get_pin_register(pin);
 }

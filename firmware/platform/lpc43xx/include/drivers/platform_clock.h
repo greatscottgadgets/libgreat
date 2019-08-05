@@ -323,18 +323,21 @@ typedef volatile struct ATTR_PACKED {
 
 	// Control register.
 	struct {
-		uint32_t powered_down                   :  1;
-		uint32_t bypassed                       :  1;
-		uint32_t direct_input                   :  1;
-		uint32_t direct_output                  :  1;
-		uint32_t clock_enable                   :  1;
-		uint32_t                                :  1;
-		uint32_t set_free_running               :  1;
-		uint32_t                                :  4;
-		uint32_t block_during_frequency_changes :  1;
-		uint32_t                                : 12;
-		uint32_t source                         :  5;
-		uint32_t                                :  3;
+		uint32_t powered_down                   : 1; // 0
+		uint32_t bypassed                       : 1; // 1
+		uint32_t direct_input                   : 1; // 2
+		uint32_t direct_output                  : 1; // 3
+		uint32_t clock_enable                   : 1; // 4
+		uint32_t                                : 1; // 5
+		uint32_t set_free_running               : 1; // 6
+		uint32_t                                : 4; // 7, 8, 9, 10
+		uint32_t block_during_frequency_changes : 1; // 11
+		uint32_t audio_write_fractional_divider : 1; // 12 [audio PLL only]
+		uint32_t audio_use_fractional_divider   : 1; // 13 [audio PLL only]
+		uint32_t audio_power_down_delta_sigma   : 1; // 14 [audio PLL only]
+		uint32_t                                : 9; // 15, 16, 17, 18, 19, 20, 21, 22, 23
+		uint32_t source                         : 5; // 24, 25, 26, 27, 28
+		uint32_t                                : 3; // 29, 30, 31
 	};
 
 	// M-divider register.
@@ -520,6 +523,13 @@ void platform_enable_branch_clock(platform_branch_clock_register_t *clock, bool 
  * @param clock The clock to enable.
  */
 void platform_disable_clock(platform_branch_clock_register_t *clock);
+
+
+/**
+ * Ensures the provided clock is active and can be used.
+ */
+int platform_enable_base_clock(platform_base_clock_register_t *base);
+
 
 
 /**

@@ -102,6 +102,12 @@ SECTIONS
 	_text_segment_ram_end = (. - ORIGIN(rom)) + ORIGIN(ram_local1);
 	_text_segment_rom_end = (. - ORIGIN(rom)) + ORIGIN(rom_flash);
 
+
+	/* layout of the m0 RAM region, for the loadables API */
+	_m0_data_region      = ORIGIN(ram_m0);
+	_m0_data_region_size = LENGTH(ram_m0);
+
+
 	. = ORIGIN(ram_local2);
 
 	.data : {
@@ -114,6 +120,7 @@ SECTIONS
 
 	_data_rom = LOADADDR (.data) + ORIGIN(rom_flash);
 	_edata_rom = _data_rom + SIZEOF (.data);
+
 
     /* dynamic allocation pool */
     .bss.heap : {

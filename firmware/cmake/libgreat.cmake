@@ -58,6 +58,45 @@ function(add_flash_executable EXECUTABLE_NAME)
 
 endfunction(add_flash_executable)
 
+
+
+#
+# Function that adds a flash "executable" target to the currrent build.
+# This executable targets our secondary processor.
+# Arguments: [binary_name] [sources...]
+#
+function(create_secondary_cpu_executable EXECUTABLE_NAME)
+
+	# Add a target for the ELF form of the executable.
+	add_executable(${EXECUTABLE_NAME}.elf ${ARGN})
+
+	# ... and set its default properties.
+	generate_linker_script_arguments(FLAGS_LINKER_SCRIPTS ${LINKER_SCRIPTS_SECONDARY_CPU})
+	target_link_options(${EXECUTABLE_NAME}.elf PRIVATE
+		${FLAGS_PLATFORM}
+		${FLAGS_ARCHITECTURE}
+		${FLAGS_SECONDARY_CPU}
+		${FLAGS_LINK_BOARD}
+		${FLAGS_LINKER_SCRIPTS}
+		${FLAGS_LINK_SECONDARY_CPU}
+		${FLAGS_LINK_COMMON}
+	)
+	target_link_directories(${EXECUTABLE_NAME}.elf PRIVATE
+		${PATH_LIBOPENCM3}/lib
+		${PATH_LIBOPENCM3}/lib/lpc43xx
+		${PATH_LIBGREAT}/firmware/platform/${LIBGREAT_PLATFORM}/linker
+	)
+	target_compile_options(${EXECUTABLE_NAME}.elf PRIVATE ${FLAGS_COMPILE_COMMON} ${FLAGS_PLATFORM} ${FLAGS_ARCHITECTURE} ${FLAGS_SECONDARY_CPU})
+	target_compile_definitions(${EXECUTABLE_NAME}.elf PRIVATE ${DEFINES_COMMON} ${DEFINES_BOARD})
+
+	#target_link_libraries(${EXECUTABLE_NAME}.elf PRIVATE c nosys ${LINK_LIBRARIES_BOARD} m)
+
+	# Add a target that creates the final binary.
+	add_custom_target(${EXECUTABLE_NAME} ALL DEPENDS ${EXECUTABLE_NAME}.elf COMMAND ${CMAKE_OBJCOPY} -Obinary ${EXECUTABLE_NAME}.elf ${EXECUTABLE_NAME})
+
+endfunction(create_secondary_cpu_executable)
+
+
 #
 # Function that creates a new libgreat library / source collection.
 # Arguments: <library_name> [sources...]
@@ -80,6 +119,27 @@ function(add_libgreat_library LIBRARY_NAME)
 	target_compile_definitions(${LIBRARY_NAME} PRIVATE ${DEFINES_COMMON} ${DEFINES_BOARD})
 
 endfunction(add_libgreat_library)
+
+#
+# Function that creates a new libgreat library / source collection.
+# Arguments: <library_name> [sources...]
+#
+function(add_secondary_cpu_library LIBRARY_NAME)
+
+	# Create the relevant library.
+	add_library(${LIBRARY_NAME} OBJECT ${ARGN})
+
+	# And set its default properties.
+	target_include_directories(${LIBRARY_NAME} PRIVATE
+		${BOARD_INCLUDE_DIRECTORIES}
+		${BUILD_INCLUDE_DIRECTORIES}
+		${PATH_LIBGREAT_FIRMWARE}/include
+		${PATH_LIBGREAT_FIRMWARE_PLATFORM}/include
+	)
+	target_compile_options(${LIBRARY_NAME} PRIVATE ${FLAGS_COMPILE_COMMON} ${FLAGS_PLATFORM} ${FLAGS_ARCHITECTURE} ${FLAGS_SECONDARY_CPU})
+	target_compile_definitions(${LIBRARY_NAME} PRIVATE ${DEFINES_COMMON} ${DEFINES_BOARD})
+
+endfunction(add_secondary_cpu_library)
 
 #
 # Function that creates a new GreatFET library / source archive iff the relevant library does not exist.

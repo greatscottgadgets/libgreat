@@ -4,7 +4,6 @@
  * LPC43xx GPIO functions
  */
 
-#include <stdbool.h>
 #include <toolchain.h>
 
 #ifndef __LIBGREAT_GPIO_H__
@@ -19,6 +18,13 @@
  * pin to a physical pin.
  */
 int gpio_configure_pinmux(gpio_pin_t pin);
+
+
+/**
+ * Configures the system's pinmux to route the given GPIO pin to a physical pin,
+ * and sets up its pull resistors.
+ */
+int gpio_configure_pinmux_and_resistors(gpio_pin_t pin, gpio_resistor_configuration_t resistor_mode);
 
 
 /**
@@ -149,5 +155,13 @@ int gpio_toggle_pin(gpio_pin_t pin);
  * @return 0 for a logic low, or 1 for a logic high
  */
 uint8_t gpio_get_pin_value(gpio_pin_t pin);
+
+
+/**
+ * Fast method for reading a GPIO pin; intended for tight loops.
+ *
+ * @returns -1 (all 1's) if the bit is high, or 0 if the bit is low
+ */
+inline uint32_t gpio_fast_get_pin_value(gpio_pin_t pin);
 
 #endif // __LIBGREAT_GPIO_H__

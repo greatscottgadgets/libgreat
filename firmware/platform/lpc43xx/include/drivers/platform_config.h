@@ -17,6 +17,9 @@
  *  LPC43xx misc. configuration registers
  */
 typedef volatile struct ATTR_PACKED {
+
+	// TODO: break into bitfields and clean up these names!
+
 	RESERVED_WORDS(1);
 
 	uint32_t creg0;
@@ -50,13 +53,37 @@ typedef volatile struct ATTR_PACKED {
 
 	uint32_t m4txevent;
 
-	// TODO: implement the rest of this
+	RESERVED_WORDS(51);
+
+	uint32_t chip_id;
+
+	RESERVED_WORDS(65);
+
+	uint32_t m0sub_shadow_base;
+	RESERVED_WORDS(2);
+	uint32_t m0sub_tx_event;
+
+	RESERVED_WORDS(58);
+
+	uint32_t m0app_tx_event;
+	uint32_t m0app_shadow_base;
+
+	RESERVED_WORDS(62);
+
+	uint32_t usb0_frame_length_adjust;
+	uint32_t usb1_frame_length_adjust;
+
 
 } platform_configuration_registers_t;
 
-ASSERT_OFFSET(platform_configuration_registers_t, creg0,    0x004);
-ASSERT_OFFSET(platform_configuration_registers_t, m4memmap, 0x100);
-ASSERT_OFFSET(platform_configuration_registers_t, etbcfg,   0x128);
+ASSERT_OFFSET(platform_configuration_registers_t, creg0,                     0x004);
+ASSERT_OFFSET(platform_configuration_registers_t, m4memmap,                  0x100);
+ASSERT_OFFSET(platform_configuration_registers_t, etbcfg,                    0x128);
+ASSERT_OFFSET(platform_configuration_registers_t, chip_id,                   0x200);
+ASSERT_OFFSET(platform_configuration_registers_t, m0sub_shadow_base,         0x308);
+ASSERT_OFFSET(platform_configuration_registers_t, m0sub_tx_event,            0x314);
+ASSERT_OFFSET(platform_configuration_registers_t, m0app_tx_event,            0x400);
+ASSERT_OFFSET(platform_configuration_registers_t, usb0_frame_length_adjust,  0x500);
 
 /**
  *  ETHMODE constants.

@@ -13,20 +13,25 @@
 #include <drivers/scu.h>
 #include <drivers/sgpio.h>
 #include <drivers/platform_clock.h>
+#include <drivers/platform_reset.h>
 #include <drivers/arm_vectors.h>
 
-#define pr_debug pr_info
+//#define pr_debug pr_info
 
 // FIXME: handle branch clock frequency changes by providing a _handle_clock_frequency_change callback!
 
 void sgpio_dump_slice_configuration(loglevel_t loglevel, sgpio_t *sgpio, uint8_t slice);
 
 // Non-public 'imports' -- functions from sgpio_isr.c that aren't for public consumption.
-interrupt_service_routine_t sgpio_generate_data_shuttle_isr(sgpio_t *sgpio);
+int sgpio_generate_data_shuttle_isr(sgpio_t *sgpio);
+bool sgpio_isr_necessary_for_function(sgpio_function_t *function);
 int sgpio_generate_isr_for_function(sgpio_function_t *function);
 void sgpio_handle_data_prepopulation(sgpio_t *sgpio);
-bool sgpio_isr_necessary_for_function(sgpio_function_t *function);
+void sgpio_handle_remaining_data(sgpio_t *sgpio);
 
+
+// Forward declarations.
+void sgpio_copy_slice_properties(sgpio_t *sgpio, uint8_t to_slice, uint8_t from_slice);
 
 
 typedef struct {
@@ -110,7 +115,7 @@ static const sgpio_scu_function_t scu_mappings[] = {
 /**
  * @returns a reference to the register bank for the device's SGPIO
  */
-static platform_sgpio_registers_t *platform_get_sgpio_registers(void)
+platform_sgpio_registers_t *platform_get_sgpio_registers(void)
 {
 	return (platform_sgpio_registers_t *)0x40101000;
 }
@@ -204,7 +209,9 @@ int sgpio_io_pin_for_slice(uint8_t slice)
 	return -EINVAL;
 }
 
-
+/**
+ * @returns the SGPIO slice that can generate a clock on the given pin
+ */
 int sgpio_slice_for_clockgen(uint8_t pin)
 {
 	const uint8_t clockgen_slice_mappings[] = {
@@ -216,6 +223,58 @@ int sgpio_slice_for_clockgen(uint8_t pin)
 
 	return clockgen_slice_mappings[pin];
 }
+
+
+/**
+ * @return the index of the SGPIO slice that can control the direction of
+ *         the given pins
+ */
+int sgpio_slice_for_direction(uint8_t pin, uint8_t bus_width)
+{
+	// Look up tables -- see commentary below.
+	const uint8_t direction_slice_mappings_2bit[] = {
+		SGPIO_SLICE_H, SGPIO_SLICE_D, SGPIO_SLICE_G, SGPIO_SLICE_O,
+		SGPIO_SLICE_P, SGPIO_SLICE_B, SGPIO_SLICE_N, SGPIO_SLICE_M,
+	};
+	const uint8_t direction_slice_mappings_4bit[] = {
+		SGPIO_SLICE_H, SGPIO_SLICE_O, SGPIO_SLICE_P, SGPIO_SLICE_N,
+	};
+	const uint8_t direction_slice_mappings_8bit[] = {
+		SGPIO_SLICE_H, SGPIO_SLICE_O, SGPIO_SLICE_P, SGPIO_SLICE_N,
+	};
+
+
+	switch (bus_width)
+	{
+
+		// For parallel bus modes (2, 4, or 8 bit), the mappings are in
+		// odd orders that -almost- seem to make sense. These are likely
+		// intended to avoid collisions with various output modes; but
+		// the user manual offers little explanation and the values are non-obvious.
+		// We'll look them up in a table appropriate for the bus size. These match
+		// Table 275 in Chapter 20 of the User Manual.
+		case 8:
+			return direction_slice_mappings_8bit[pin / 8];
+		case 4:
+			return direction_slice_mappings_4bit[pin / 8];
+		case 2:
+			return direction_slice_mappings_2bit[pin / 2];
+
+
+		// Special case: if we have a single-bit bus, the direction slice is the "mirror" of
+		// the I/O slice -- it exists in the same place in the opposite "concatenation chain".
+		// Essentially, if we're trying to control the direction of SGPIO1, we'd use the slice
+		// associated with SGPIO8, as the LPC43xx SGPIO tries to keep the direction and data
+		// slices on opposite sides of the chip.
+		case 1:
+			return sgpio_slice_for_io(pin + (SGPIO_NUM_SLICES / 2));
+
+		default:
+			pr_error("Invalid bus width %" PRIu8 "!\n", bus_width);
+			return -1;
+	}
+}
+
 
 
 /**
@@ -254,18 +313,32 @@ static int sgpio_set_up_clocking(sgpio_t *sgpio, sgpio_function_t *function, uin
 
 	// Finally, compute the local shift clock parameters, if the shift clock is used.
 	if (clock_source_type == SGPIO_CLOCK_SOURCE_TYPE_LOCAL) {
+
 		platform_clock_control_register_block_t *ccu = get_platform_clock_control_registers();
 		uint32_t sgpio_clock_frequency = platform_get_branch_clock_frequency(&ccu->periph.sgpio);
+		uint32_t clock_divider;
 
-		// Compute the shift clock divider, based on the current branch clock frequency.
-		// TODO: do we want to round, here?
-		uint32_t clock_divider = sgpio_clock_frequency / function->shift_clock_frequency;
+		// If the frequency has been defined as zero, we take this to mean "as fast as possible" --
+		// i.e. at the undivided rate of the SGPIO clock.
+		if (function->shift_clock_frequency == 0) {
 
-		// If we couldn't figure out a clock divider, bail out!
-		if (clock_divider == 0) {
-			pr_error("error: sgpio slice %d: could not meet timing! could not produce a %" PRIu32 " clock from a %"
-			          PRIu32 " input clock.\n", function->shift_clock_frequency, sgpio_clock_frequency);
-			return EINVAL;
+			// This is trivial; we just use a divider of one. :)
+			clock_divider = 1;
+		}
+
+		// In all other cases, we'll have to figure out a clock divider.
+		else {
+
+			// Compute the shift clock divider, based on the current branch clock frequency.
+			// TODO: do we want to round, here?
+			clock_divider = sgpio_clock_frequency / function->shift_clock_frequency;
+
+			// If we couldn't figure out a clock divider, bail out!
+			if (clock_divider == 0) {
+				pr_error("error: sgpio slice %c: could not meet timing! could not produce a %" PRIu32 " clock from a %"
+						PRIu32 " input clock.\n", slice + 'A', function->shift_clock_frequency, sgpio_clock_frequency);
+				return EINVAL;
+			}
 		}
 
 		// Set up counter that will generate the relevant clock.
@@ -275,6 +348,20 @@ static int sgpio_set_up_clocking(sgpio_t *sgpio, sgpio_function_t *function, uin
 		// Update the function's knowledge of the shift clock with the actual clock rate achieved.
 		// This will be different if the SGPIO clock isn't evenly divisible by the desired clock rate.
 		function->shift_clock_frequency = sgpio_clock_frequency / clock_divider;
+	}
+
+	// If we're expecting to use an external pin as our ULPI shift clock, we need to configure that
+	// pin's multiplexing.
+	else if (clock_source_type == SGPIO_CLOCK_SOURCE_TYPE_PIN) {
+
+		// If we don't have a configuration block, error out.
+		if (!function->shift_clock_input) {
+			pr_error("error: sgpio configuration specifies an external clock; but does not define its pin!\n");
+			return EINVAL;
+		}
+
+		// Multiplex the shift clock pin to the SGPIO block.
+		sgpio_set_up_pin(sgpio, function->shift_clock_input);
 	}
 
 	return 0;
@@ -287,7 +374,7 @@ static int sgpio_set_up_clocking(sgpio_t *sgpio, sgpio_function_t *function, uin
 static int sgpio_set_up_shift_condition(sgpio_t *sgpio, sgpio_function_t *function, uint8_t slice)
 {
 	uint8_t qualifier_type   = function->shift_clock_qualifier & SGPIO_QUALIFIER_TYPE_MASK;
-	uint8_t qualifier_source = function->shift_clock_source    & SGPIO_QUALIFIER_SELECT_MASK;
+	uint8_t qualifier_source = function->shift_clock_qualifier & SGPIO_QUALIFIER_SELECT_MASK;
 
 	// Set up the qualifier type, which determines when the shift clock will trigger a data shift.
 	sgpio->reg->shift_configuration[slice].shift_qualifier_mode = qualifier_type >> SGPIO_QUALIFIER_TYPE_SHIFT;
@@ -300,8 +387,62 @@ static int sgpio_set_up_shift_condition(sgpio_t *sgpio, sgpio_function_t *functi
 	// Finally, set up the polarity of our qualifier.
 	sgpio->reg->feature_control[slice].invert_shift_qualifier    = function->shift_clock_qualifier_is_active_low;
 
+	// If we're expecting to use an external pin as our clock qualifier, set up that pin's multiplexing.
+	if (qualifier_type == SGPIO_QUALIFIER_TYPE_PIN) {
+
+		// If we don't have a configuration block, error out.
+		if (!function->shift_clock_qualifier_input) {
+			pr_error("error: sgpio configuration specifies an external clock qualifier; but does not define its pin!\n");
+			return EINVAL;
+		}
+
+		// Multiplex the shift qualifier pin to the SGPIO block.
+		sgpio_set_up_pin(sgpio, function->shift_clock_qualifier_input);
+	}
+
 	return 0;
 }
+
+
+int sgpio_apply_shift_limits(sgpio_t *sgpio, sgpio_function_t *function, uint8_t slice,
+		uint8_t total_concatenated_slices, uint8_t bus_width)
+{
+	uint8_t shifts_per_swap = (SGPIO_BITS_PER_SLICE * total_concatenated_slices) / bus_width;
+
+	// Check to see if we can apply the given shift limit.
+	// This restriction should eventually be dropped with the IRQ starts handling this.
+	bool shift_can_be_limited = function->shift_count_limit <= shifts_per_swap;
+
+	// If we don't have a shift limit, there's nothing to apply. Trivially succeed.
+	if (!function->shift_count_limit) {
+		return 0;
+	}
+
+	if (!shift_can_be_limited) {
+		pr_error("sgpio: error: can't apply shift limits; shift limit is larger than maximum shift chain!\n");
+		pr_error("              buffer depth: %d, bus width: %d, shifts per swap: %d vs shift count limit: %d\n",
+			total_concatenated_slices, bus_width, shifts_per_swap, function->shift_count_limit);
+		pr_error("              applying to slice %c\n", slice + 'A');
+		return ENOMEM;
+	}
+
+	pr_debug("sgpio: applying shift limit of %d shifts on slice %c\n", function->shift_count_limit, 'A' + slice);
+
+	// Compute the final value of the swap-control register...
+	sgpio_shift_position_register_t swap_control_value = {
+		.shifts_per_buffer_swap = 0,
+		.shifts_remaining       = function->shift_count_limit - 1
+	};
+
+	// ... and apply it to the relevant slice.
+	sgpio->reg->data_buffer_swap_control[slice] = swap_control_value;
+
+	// Set the "stop on next buffer swap" register to halt shifting when our limit has been reached.
+	sgpio->reg->stop_on_next_buffer_swap |= 1 << slice;
+
+	return 0;
+}
+
 
 
 /**
@@ -311,7 +452,8 @@ static int sgpio_set_up_shift_condition(sgpio_t *sgpio, sgpio_function_t *functi
  * @param total_concatinated_slices The total number of slices in the current concatenation.
  * @param bus_width The total number of bits taken in per shift.
  */
-void sgpio_set_up_double_buffering(sgpio_t *sgpio, uint8_t slice, uint8_t total_concatenated_slices, uint8_t bus_width)
+void sgpio_set_up_double_buffering(sgpio_t *sgpio, uint8_t slice,
+		uint8_t total_concatenated_slices, uint8_t bus_width)
 {
 	uint8_t shifts_per_swap = (SGPIO_BITS_PER_SLICE * total_concatenated_slices) / bus_width;
 
@@ -324,25 +466,27 @@ void sgpio_set_up_double_buffering(sgpio_t *sgpio, uint8_t slice, uint8_t total_
 	// ... and apply it to the relevant slice.
 	sgpio->reg->data_buffer_swap_control[slice] = swap_control_value;
 
-	// Ensure double buffering is enabled for the relevant slice.
-	sgpio->reg->disable_double_buffering &= ~(1 << slice);
+	// Ensure we keep running after a buffer swap.
+	sgpio->reg->stop_on_next_buffer_swap &= ~(1 << slice);
 }
 
 
 /**
  * Configures the shape of the bus created through our SGPIO slices, based on its function description.
  */
-static int sgpio_set_up_bus_topology(sgpio_t *sgpio, sgpio_function_t *function, uint8_t slice)
+static int sgpio_set_up_bus_topology(sgpio_t *sgpio, sgpio_function_t *function)
 {
+	uint8_t io_slice = function->io_slice;
+
 	// Select the PARALLEL mode based on the bus width requested.
 	switch (function->bus_width) {
 
 		// Set the SGPIO modes based on our reported bus width.
 		case 1:
-			sgpio->reg->feature_control[slice].parallel_mode = SGPIO_PARALLEL_MODE_SERIAL;
+			sgpio->reg->feature_control[io_slice].parallel_mode = SGPIO_PARALLEL_MODE_SERIAL;
 			break;
 		case 2:
-			sgpio->reg->feature_control[slice].parallel_mode = SGPIO_PARALLEL_MODE_2BIT;
+			sgpio->reg->feature_control[io_slice].parallel_mode = SGPIO_PARALLEL_MODE_2BIT;
 			break;
 
 		case 3:
@@ -351,7 +495,7 @@ static int sgpio_set_up_bus_topology(sgpio_t *sgpio, sgpio_function_t *function,
 			// Falls through.
 
 		case 4:
-			sgpio->reg->feature_control[slice].parallel_mode = SGPIO_PARALLEL_MODE_4BIT;
+			sgpio->reg->feature_control[io_slice].parallel_mode = SGPIO_PARALLEL_MODE_4BIT;
 			break;
 
 		case 5:
@@ -363,7 +507,7 @@ static int sgpio_set_up_bus_topology(sgpio_t *sgpio, sgpio_function_t *function,
 			// Falls through.
 
 		case 8:
-			sgpio->reg->feature_control[slice].parallel_mode = SGPIO_PARALLEL_MODE_8BIT;
+			sgpio->reg->feature_control[io_slice].parallel_mode = SGPIO_PARALLEL_MODE_8BIT;
 			break;
 
 		default:
@@ -372,12 +516,31 @@ static int sgpio_set_up_bus_topology(sgpio_t *sgpio, sgpio_function_t *function,
 	}
 
 	// Set the relevant slice to draw input from its I/O pin; and use only the current slice for buffering.
-	sgpio->reg->shift_configuration[slice].enable_concatenation = 0;
+	sgpio->reg->shift_configuration[io_slice].enable_concatenation = 0;
 	function->buffer_depth_order = 0;
 
 	// Finally, set up the shift position register for the given slice.
 	// Until we expand our chain via concatenation, we use only a single 32-bit buffer, divided by the bus width.
 	sgpio_set_up_double_buffering(sgpio, function->io_slice, 1, function->bus_width);
+
+	// If we're in bidirectional mode, we'll copy our slice settings to
+	// our direction control register. Like the I/O slice, we'll start off with a single direction slice.
+	if (function->mode == SGPIO_MODE_STREAM_BIDIRECTIONAL) {
+		sgpio_copy_slice_properties(sgpio, function->direction_slice, function->io_slice);
+
+		// We'll make two modifications 1) the shift width for directions in non-serial modes is
+		// always two; as the MSB specifies the direction for everything but the 0th pin.
+		if (function->bus_width != 1) {
+			sgpio->reg->feature_control[function->direction_slice].parallel_mode = SGPIO_PARALLEL_MODE_2BIT;
+		}
+
+		// ... and 2) directions never take input from external pins. Set them to self-loop instead.
+		sgpio->reg->shift_configuration[function->direction_slice].enable_concatenation = 1;
+		sgpio->reg->shift_configuration[function->direction_slice].concatenation_order = 0;
+
+		// Start off with a single slice.
+		function->direction_buffer_depth_order = 0;
+	}
 
 	return 0;
 }
@@ -420,10 +583,35 @@ int sgpio_set_up_function(sgpio_t *sgpio, sgpio_function_t *function)
 	// to squish parallel data into the slice for the first pin.
 	switch(function->mode) {
 
-		case SGPIO_MODE_STREAM_DATA_IN:
-			function->io_slice = sgpio_slice_for_io(first_pin_number);
-			break;
+		// If we're in bidirectional mode, we'll need to set up a slice that will control the pin's
+		// current direction -- this allows us to switch between input and output in the pipeline.
+		case SGPIO_MODE_STREAM_BIDIRECTIONAL:
+			function->direction_slice = sgpio_slice_for_direction(first_pin_number, function->bus_width);
 
+			// If we failed to figure out a direction slice, fail out.
+			if (function->direction_slice == 0xFF) {
+				return rc;
+			}
+
+			// If we'd need to use a slice that's already in use, fail out.
+			if ((1 << function->direction_slice) & sgpio->slices_in_use) {
+				uint8_t first_pin = function->pin_configurations[0].sgpio_pin;
+				uint8_t last_pin = first_pin + function->bus_width - 1;
+
+				pr_error("sgpio: cannot configure SGPIO%d-SGPIO%d as bidirectional;"
+						" the necessary direction slice (slice %c / %d) is in use (used mask: %08x)!\n",
+						first_pin, last_pin, function->direction_slice + 'A',
+						function->direction_slice, sgpio->pins_in_use);
+				return EBUSY;
+			}
+
+			// Mark the direction slice as used.
+			sgpio->slices_in_use |= (1 << function->direction_slice);
+			pr_debug("sgpio: function using direction slice %u\n", function->io_slice);
+
+			// falls through
+
+		case SGPIO_MODE_STREAM_DATA_IN:
 		case SGPIO_MODE_STREAM_DATA_OUT:
 		case SGPIO_MODE_FIXED_DATA_OUT:
 			function->io_slice = sgpio_slice_for_io(first_pin_number);
@@ -453,7 +641,7 @@ int sgpio_set_up_function(sgpio_t *sgpio, sgpio_function_t *function)
 	}
 
 	// Set up the data width for the relevant slice.
-	rc = sgpio_set_up_bus_topology(sgpio, function, function->io_slice);
+	rc = sgpio_set_up_bus_topology(sgpio, function);
 	if (rc) {
 		return rc;
 	}
@@ -489,8 +677,15 @@ bool sgpio_slices_for_buffer_free(sgpio_t *sgpio, uint8_t io_slice, uint8_t firs
 	return true;
 }
 
+
+/**
+ * Copies a slice configuration from one slice to another.
+ */
 void sgpio_copy_slice_properties(sgpio_t *sgpio, uint8_t to_slice, uint8_t from_slice)
 {
+	uint32_t to_slice_bitmask   = (1 << to_slice);
+	uint32_t from_slice_bitmask = (1 << from_slice);
+
 	// Copy the core contents of our slice control registers.
 	sgpio->reg->shift_configuration[to_slice] = sgpio->reg->shift_configuration[from_slice];
 	sgpio->reg->feature_control[to_slice]     = sgpio->reg->feature_control[from_slice];
@@ -502,19 +697,29 @@ void sgpio_copy_slice_properties(sgpio_t *sgpio, uint8_t to_slice, uint8_t from_
 	// Determine how often we swap the data and shadow buffers.
 	sgpio->reg->data_buffer_swap_control[to_slice] = sgpio->reg->data_buffer_swap_control[from_slice];
 
-	// TODO: handle "pos disable" fields for clock generation
+	// Copy the value of the "stop on next swap" bit.
+	if (sgpio->reg->stop_on_next_buffer_swap & from_slice_bitmask) {
+		sgpio->reg->stop_on_next_buffer_swap |= to_slice_bitmask;
+	} else {
+		sgpio->reg->stop_on_next_buffer_swap &= ~to_slice_bitmask;
+	}
+
 }
+
 
 
 /**
  * @returns the buffer depth necessary to contain a user buffer, or the provided maximum slice depth, whichever is lower.
  *    Used to ensure a concatenation depth doesn't allocate more than we can transfer to/from the user buffer.
  */
-static uint8_t sgpio_limit_buffer_depth_to_user_buffer_size(sgpio_function_t *function, uint8_t maximum_depth)
+static uint8_t sgpio_limit_buffer_depth_to_user_limits(sgpio_function_t *function, uint8_t maximum_depth)
 {
+
 	// Compute the user buffer size in slices...
 	uint32_t buffer_size_bytes = (1 << function->buffer_order);
 	uint32_t buffer_size_slices = buffer_size_bytes / sizeof(uint32_t);
+
+	uint8_t smallest_size;
 
 	// Special case: if we have less than a slice worth of data, return a maximum order of a single slice.
 	if (buffer_size_bytes < sizeof(uint32_t)) {
@@ -523,12 +728,27 @@ static uint8_t sgpio_limit_buffer_depth_to_user_buffer_size(sgpio_function_t *fu
 
 	// Special case: if this is fixed-data-out mode, we can use both the slice and the shadow registers
 	// to store our output data, so we can actually halve the necessary buffer size in slices.
-	if ((function->mode == SGPIO_MODE_FIXED_DATA_OUT) && (buffer_size_slices > 1)) {
+	if ((function->mode == SGPIO_MODE_FIXED_DATA_OUT) && (buffer_size_slices > 1) && (function->shift_count_limit == 0)) {
 		buffer_size_slices /= 2;
 	}
 
 	// Return either the user buffer size in slices, or the provided depth limit, whichever is lower.
-	return (buffer_size_slices > maximum_depth) ? maximum_depth : buffer_size_slices;
+	smallest_size = (buffer_size_slices > maximum_depth) ? maximum_depth : buffer_size_slices;
+
+	// If we have a shift count limit, figure out if it's smaller than our current 'useful' buffer length.
+	/*
+	if (function->shift_count_limit) {
+
+		uint8_t shifts_per_slice = sizeof(uint32_t) / function->bus_width;
+		uint8_t slices_in_limit = (function->shift_count_limit + (shifts_per_slice - 1)) / shifts_per_slice;
+
+		if (slices_in_limit < smallest_size) {
+			return smallest_size = slices_in_limit;
+		}
+	}
+	*/
+
+	return smallest_size;
 }
 
 
@@ -544,29 +764,117 @@ static uint8_t sgpio_maximum_useful_buffer_depth_for_function(sgpio_function_t *
 			return 1;
 
 		// In unidirectional modes, it makes sense to use as much buffer as we can -- so either
-		// the maximum chain length, or the amount of slices necessary to contain a full user buffer,
-		// whichever is smaller.
+		// the maximum chain length, the amount of slices necessary to contain a full user buffer,
+		// or any user-imposed length limits, whichever is smaller.
 	    case SGPIO_MODE_STREAM_DATA_IN:
 		case SGPIO_MODE_STREAM_DATA_OUT:
 		case SGPIO_MODE_FIXED_DATA_OUT:
-			return sgpio_limit_buffer_depth_to_user_buffer_size(function, SGPIO_MAXIMUM_SLICE_CHAIN_DEPTH);
+			return sgpio_limit_buffer_depth_to_user_limits(function, SGPIO_MAXIMUM_SLICE_CHAIN_DEPTH);
 
-		// Bidirectional modes are a little more complex. If our I/O slice is 'A', we can use a full-depth buffer;
-		// otherwise we're stuck using only half the maximum size. This is because we need to reserve some slices from
+		// Bidirectional modes are a little more complex. If our I/O slice is in the lower half, we can use a full-depth
+		// buffer; otherwise we're stuck using only half the maximum size. This is because we need to reserve some slices from
 		// D/H/O/P to set the output's direction.
 		case SGPIO_MODE_STREAM_BIDIRECTIONAL: {
 			uint32_t maximum_bidirectional_depth = SGPIO_MAXIMUM_SLICE_CHAIN_DEPTH;
 
-			// If we're not working with a slice-chain starting with A, have the maximum slice depth.
-			if (function->io_slice != SGPIO_SLICE_A) {
+			// If we're not working with a slice-chain starting with A, halve the maximum slice depth.
+			if (function->io_slice >= (SGPIO_NUM_SLICES / 2)) {
 				maximum_bidirectional_depth /= 2;
 			}
 
-			return sgpio_limit_buffer_depth_to_user_buffer_size(function, maximum_bidirectional_depth);
+			return sgpio_limit_buffer_depth_to_user_limits(function, maximum_bidirectional_depth);
 		}
 
+		default:
+			pr_error("sgpio: cannot figure out how to lay out an undefiend mode!\n");
+			return 0;
 	}
 }
+
+
+
+static bool sgpio_attempt_to_double_direction_buffer_size(sgpio_t *sgpio, sgpio_function_t *function)
+{
+	// Figure out the current configuration order.
+	uint8_t concat_order = function->direction_buffer_depth_order;
+	uint8_t desired_concatenation_order = concat_order + 1;
+
+	// Convert the depth-order to a number of relevant slices.
+	uint8_t buffer_depth_slices  = 1 << concat_order;
+	uint8_t desired_buffer_depth = 1 << desired_concatenation_order;
+	pr_debug("sgpio: attempting to double direction buffer from %u to %u slices\n", buffer_depth_slices, desired_buffer_depth);
+
+	// If we can't grab the slices necessary to double the relevant buffer size, return that we can't
+	// optimize any further.
+	if (!sgpio_slices_for_buffer_free(sgpio, function->direction_slice, buffer_depth_slices, desired_buffer_depth)) {
+		pr_debug("sgpio: cannot optimize further -- not enough direction slices free!\n");
+		return false;
+	}
+
+	// Accept the new buffer order.
+	pr_debug("sgpio: doubling direction buffer!\n");
+	function->buffer_depth_order = desired_concatenation_order;
+
+	// Update the double buffering for our direction slice to indicate the new direction chain length.
+	sgpio_set_up_double_buffering(sgpio, function->direction_slice, desired_buffer_depth, function->bus_width);
+
+
+	// If all of our conditions here are met, we can grab the relevant slices.
+	// Iterate over each of the slices in our new buffer, and configure them.
+	for (unsigned i = 0; i < desired_buffer_depth; ++i) {
+		uint8_t target_slice = sgpio_slice_in_concatenation(function->direction_slice, i);
+		volatile sgpio_shift_config_register_t *shift_config = &sgpio->reg->shift_configuration[target_slice];
+
+		// If this element isn't the direction slice, copy the direction slice's properties to it.
+		if (target_slice != function->direction_slice) {
+			sgpio_copy_slice_properties(sgpio, target_slice, function->direction_slice);
+		}
+
+		// Always create a big self-loop, as there's nowhere to accept input from but the shift buffer.
+		shift_config->enable_concatenation = 1;
+
+		// Set the slice's new concatenation order.
+		shift_config->concatenation_order  = desired_concatenation_order;
+
+		// Mark the new slice as used.
+		sgpio->slices_in_use |= (1 << target_slice);
+	}
+
+	return true;
+}
+
+
+
+static bool sgpio_ensure_direction_specification_is_possible(sgpio_t *sgpio,
+		sgpio_function_t *function, uint8_t desired_buffer_depth)
+{
+	// Convert our "order" representation of direction buffer depth into a buffer depth in slices.
+	uint32_t direction_buffer_depth = 1 << function->direction_buffer_depth_order;
+
+	// If we're shifting a pure serial (1-bit), the SGPIO peripheral only uses a single bit
+	// of direction. Otherwise, for all parallel mode (2 - 8 bit width), it uses two.
+	uint8_t  direction_shift_width = (function->bus_width == 1) ? 1 : 2;
+
+	// Determine how many 'shifts' (samples) worth of data can fit in our theoretical new buffer
+	uint32_t shifts_in_new_buffer = (desired_buffer_depth * 32) / function->bus_width;
+	uint32_t shifts_in_current_direction_buffer = (direction_buffer_depth * 32) / direction_shift_width;
+
+	// If we're not in bidirectional mode, we can always handle the direction -- it's just
+	// set in the pin direction register.
+	if (function->mode != SGPIO_MODE_STREAM_BIDIRECTIONAL) {
+		return true;
+	}
+
+	// If we can fit enough shifts in the current direction buffer, we're done, and the growth
+	// is possible.
+	if (shifts_in_current_direction_buffer >= shifts_in_new_buffer) {
+		return true;
+	}
+
+	// Otherwise, try to double the length of the direction buffer to accommodate the desired data buffer length.
+	return sgpio_attempt_to_double_direction_buffer_size(sgpio, function);
+}
+
 
 /**
  * Attempts to optimize SGPIO buffer size by doubling the relevant function's buffer into any nearby,
@@ -574,7 +882,7 @@ static uint8_t sgpio_maximum_useful_buffer_depth_for_function(sgpio_function_t *
  *
  * //TODO: We should avoid doubling into a slice that wants to be used as an output clock, if possible.
  */
-bool sgpio_attempt_to_double_buffer_size(sgpio_t *sgpio, sgpio_function_t *function)
+static bool sgpio_attempt_to_double_buffer_size(sgpio_t *sgpio, sgpio_function_t *function)
 {
 	// Figure out the current configuration order.
 	uint8_t concat_order = function->buffer_depth_order;
@@ -584,6 +892,12 @@ bool sgpio_attempt_to_double_buffer_size(sgpio_t *sgpio, sgpio_function_t *funct
 	uint8_t buffer_depth_slices  = 1 << concat_order;
 	uint8_t desired_buffer_depth = 1 << desired_concatenation_order;
 	pr_debug("sgpio: attempting to double buffer from %u to %u slices\n", buffer_depth_slices, desired_buffer_depth);
+
+
+	// Figure out if the current mode accepts input -- this is used to determine the shape
+	// of our concatenation.
+	bool mode_accepts_input =
+			(function->mode == SGPIO_MODE_STREAM_DATA_IN) || (function->mode == SGPIO_MODE_STREAM_BIDIRECTIONAL);
 
 	// If we've already maximized this slice's buffer depth, we can't optimize any further.
 	if (desired_buffer_depth > sgpio_maximum_useful_buffer_depth_for_function(function)) {
@@ -597,31 +911,51 @@ bool sgpio_attempt_to_double_buffer_size(sgpio_t *sgpio, sgpio_function_t *funct
 		return false;
 	}
 
+	// If we wouldn't be capable of controlling the direction of this new buffer, we can't continue.
+	// This is primarily a check for bidirectional modes, which require slices to check their direction.
+	//
+	// NOTE: This check must be last, as it will actively increase the size of the direction buffer to make
+	// things work. It'd be a waste to bail out after doing so. :)
+	if (!sgpio_ensure_direction_specification_is_possible(sgpio, function, desired_buffer_depth)) {
+		pr_debug("sgpio: cannot optimize further -- cannot sufficiently extend the direction buffer!\n");
+		return false;
+	}
+
 	pr_debug("sgpio: doubling buffer!\n");
 	function->buffer_depth_order = desired_concatenation_order;
 
 	// Update our double-buffering to now take into account the entire chain of concatenated slices.
 	sgpio_set_up_double_buffering(sgpio, function->io_slice, desired_buffer_depth, function->bus_width);
 
-	// If all of our conditions here are met, we can grab the relevant slices.
+	//
+	// If all of our conditions here are met, we can grab the relevant slices! Let's do so:
+	//
+
+	// For input modes, we'll need to figure out which slice we now accept input from.
+	// For input slices, this is the I/O slice, but for bidirectional modes, the output slice is considered the
+	// I/O slice. For those modes, the input slice will be the slice opposite the
+	uint8_t input_slice = (function->mode == SGPIO_MODE_STREAM_BIDIRECTIONAL) ?
+		0xFF :                 // FIXME: support bidirectional input!
+		function->io_slice;
+
+
 	// Iterate over each of the slices in our new buffer, and configure them.
 	for (unsigned i = 0; i < desired_buffer_depth; ++i) {
 		uint8_t target_slice = sgpio_slice_in_concatenation(function->io_slice, i);
 		volatile sgpio_shift_config_register_t *shift_config = &sgpio->reg->shift_configuration[target_slice];
+
 
 		// If this element isn't the I/O slice, copy the I/O slice's properties to it.
 		if (target_slice != function->io_slice) {
 			sgpio_copy_slice_properties(sgpio, target_slice, function->io_slice);
 		}
 
-		// If this is the I/O slices, and we're in pure-input mode, accept input from the I/O pin.
+		// If this is the I/O slices, and we're accept input, accept input from the I/O pin.
 		// Otherwise, always accept input from a concatinated slice. This builds maximum length chains;
 		// and creates one big self-loop. For most modes, the self-loop is inconsequential; but for fixed-pattern
 		// modes this is necessary.
 		shift_config->enable_concatenation =
-			(function->mode != SGPIO_MODE_STREAM_DATA_IN) || (target_slice != function->io_slice);
-
-		// TODO: does this also work for bidirectional mode?
+			(!mode_accepts_input) || (target_slice != input_slice);
 
 		// Set the slice's new concatenation order.
 		shift_config->concatenation_order  = desired_concatenation_order;
@@ -642,7 +976,7 @@ bool sgpio_attempt_to_double_buffer_size(sgpio_t *sgpio, sgpio_function_t *funct
  * @returns True if the current state is believed to be optimal; or false if this method
  * 		should be called again.
  */
-bool sgpio_attempt_buffer_optimization(sgpio_t *sgpio)
+static bool sgpio_attempt_buffer_optimization(sgpio_t *sgpio)
 {
 	// Start off by assuming our configuration is optimal, until one of our optimizations
 	// provides otherwise.
@@ -657,6 +991,7 @@ bool sgpio_attempt_buffer_optimization(sgpio_t *sgpio)
 			case SGPIO_MODE_STREAM_DATA_IN:
 			case SGPIO_MODE_STREAM_DATA_OUT:
 			case SGPIO_MODE_FIXED_DATA_OUT:
+			case SGPIO_MODE_STREAM_BIDIRECTIONAL:
 				optimization_achieved = sgpio_attempt_to_double_buffer_size(sgpio, function);
 				break;
 
@@ -722,7 +1057,7 @@ static int sgpio_set_pin_to_clkout_mode(sgpio_t *sgpio, sgpio_pin_configuration_
 	uint8_t clk_pin = pin_config->sgpio_pin;
 	volatile sgpio_output_config_register_t *config = &sgpio->reg->output_configuration[clk_pin];
 
-	// Ensure the relevant pin is routed to its appropriate locaiton...
+	// Ensure the relevant pin is routed to its appropriate location...
 	rc = sgpio_set_up_pin(sgpio, pin_config);
 
 	// Set the relevant pin to to output mode...
@@ -799,6 +1134,7 @@ static int sgpio_set_up_shift_clock_output(sgpio_t *sgpio, sgpio_function_t *fun
 }
 
 
+
 /**
  * Sets up the SGPIO pins used by the given function to provide any relevant output functionality.
  */
@@ -847,10 +1183,34 @@ static int sgpio_set_up_output_pins_for_function(sgpio_t *sgpio, sgpio_function_
 				break;
 
 
-			// Handle our most complex mode -- bidirectional uses slices to set the direction
-			// of pins on the relevant bus.
+			// Bidirectional modes use the contents of slices to determine whether the pins
+			// in our function are input or output. Which slices are used is fixed -- so we
+			// only need to select the bus width to know how many bits those directions apply to.
 			case SGPIO_MODE_STREAM_BIDIRECTIONAL:
-				pr_error("sgpio: bidirectional buffer support is not yet implemented!\n");
+
+				// Set the output mode to use our I/O slice as the output boundary...
+				output_config->output_bus_mode      = sgpio_output_mode_for_output_buffer(function->bus_width);
+
+				// Tri-state the output for any bidirectional pins before we tell the SGPIO peripheral
+				// about the direction register.
+				sgpio->reg->data[function->direction_slice] = 0;
+
+				// ... and finally, apply the direction register.
+				switch (function->bus_width) {
+					case 8:
+						output_config->pin_direction_source = SGPIO_DIRECTION_MODE_8BIT;
+						break;
+					case 4:
+						output_config->pin_direction_source = SGPIO_DIRECTION_MODE_4BIT;
+						break;
+					case 2:
+						output_config->pin_direction_source = SGPIO_DIRECTION_MODE_2BIT;
+						break;
+					case 1:
+						output_config->pin_direction_source = SGPIO_DIRECTION_MODE_1BIT;
+				}
+
+
 				break;
 		}
 	}
@@ -866,6 +1226,7 @@ static int sgpio_set_up_output_pins_for_function(sgpio_t *sgpio, sgpio_function_
 	return 0;
 }
 
+
 /**
  * Set up any output pins relevant to the given SGPIO block.
  */
@@ -873,6 +1234,7 @@ static int sgpio_set_up_output_pins(sgpio_t *sgpio)
 {
 	int rc;
 
+	// Configure the output pins for each of our functions.
 	for (unsigned i = 0; i < sgpio->function_count; ++i) {
 		rc = sgpio_set_up_output_pins_for_function(sgpio, &sgpio->functions[i]);
 		if (rc) {
@@ -884,6 +1246,54 @@ static int sgpio_set_up_output_pins(sgpio_t *sgpio)
 }
 
 
+
+int sgpio_enforce_all_shift_limits(sgpio_t *sgpio)
+{
+	int rc;
+
+	// Iterate over all of our functions...
+	for (unsigned i = 0; i < sgpio->function_count; ++i) {
+		sgpio_function_t *function = &sgpio->functions[i];
+
+		uint8_t buffer_depth = (1 << function->buffer_depth_order);
+		uint8_t direction_buffer_depth = (1 << function->direction_buffer_depth_order);
+
+		uint8_t direction_bus_width = (function->bus_width == 1) ? 1 : 2;
+
+		// ... and then over all of their slices.
+		for (unsigned slice_depth = 0; slice_depth < buffer_depth; ++slice_depth) {
+
+			// Grab the slice that's at the relevant position in our concatenated slice buffer.
+			uint8_t slice = sgpio_slice_in_concatenation(function->io_slice, slice_depth);
+
+			// And finally, apply our limits to it.
+			rc = sgpio_apply_shift_limits(sgpio, function, slice, buffer_depth, function->bus_width);
+			if (rc) {
+				return rc;
+			}
+		}
+
+		// Special case: if this is a bidirectional function, apply those to our direction chain as well.
+		if (function->mode == SGPIO_MODE_STREAM_BIDIRECTIONAL) {
+			for (unsigned slice_depth = 0; slice_depth < direction_buffer_depth; ++slice_depth) {
+
+				// Grab the slice that's at the relevant position in our concatenated slice buffer.
+				uint8_t slice = sgpio_slice_in_concatenation(function->direction_slice, slice_depth);
+
+				// And finally, apply our limits to it.
+				rc = sgpio_apply_shift_limits(sgpio, function, slice, direction_buffer_depth, direction_bus_width);
+				if (rc) {
+					return rc;
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
+
+
 /**
  * Sets up an SGPIO instance to run a provided set of functions.
  *
@@ -893,11 +1303,15 @@ static int sgpio_set_up_output_pins(sgpio_t *sgpio)
  */
 int sgpio_set_up_functions(sgpio_t *sgpio)
 {
-	interrupt_service_routine_t data_isr;
+	platform_reset_register_block_t *reset = get_platform_reset_registers();
 	unsigned int optimization_passes = 0;
 
 	bool buffer_optimization_complete = false;
+	reset_select_t reset_select = { .sgpio_reset = 1};
 	int rc;
+
+	// Bring the SGPIO peripheral back to its clean state.
+	reset->reset_control = reset_select;
 
 	// First, ensure our SGPIO object has a reference to the right register bank.
 	sgpio->reg = platform_get_sgpio_registers();
@@ -940,6 +1354,8 @@ int sgpio_set_up_functions(sgpio_t *sgpio)
 	}
 	pr_debug("sgpio: optimization complete in %u passes\n", optimization_passes);
 
+	// FIXME: ensure shift limit is applied, here!
+
 	// Set up each pin for any output functions it may serve.
 	pr_debug("sgpio: configuring output pins\n");
 	rc = sgpio_set_up_output_pins(sgpio);
@@ -947,16 +1363,21 @@ int sgpio_set_up_functions(sgpio_t *sgpio)
 		return rc;
 	}
 
+	// Ensure that all of our requested shift limits have been applied.
+	pr_debug("sgpio: applying shift limits\n");
+	rc = sgpio_enforce_all_shift_limits(sgpio);
+	if (rc) {
+		return rc;
+	}
+
+
 	// Finally, generate the ISR that shuttles data around.
 	pr_debug("sgpio: generating our data-handling ISR\n");
-	data_isr = sgpio_generate_data_shuttle_isr(sgpio);
-	pr_debug("sgpio: ISR generation complete.");
-
-	// If we have a data ISR, install it as our interrupt handler.
-	if(data_isr) {
-		platform_set_interrupt_handler(SGPIO_IRQ, data_isr);
-		vector_table.irqs[SGPIO_IRQ] = data_isr;
+	rc = sgpio_generate_data_shuttle_isr(sgpio);
+	if (rc) {
+		return rc;
 	}
+	pr_debug("sgpio: ISR generation complete.\n");
 
 	return 0;
 }
@@ -978,33 +1399,79 @@ void sgpio_run(sgpio_t *sgpio)
 	sgpio_handle_data_prepopulation(sgpio);
 
 	// Enable the exchange clock interrupt for each I/O slice, if required.
-	for (unsigned i = 0; i < sgpio->function_count; ++i) {
-		if (sgpio_isr_necessary_for_function(&sgpio->functions[i])) {
-			sgpio->reg->exchange_clock_interrupt.set = 1 << sgpio->functions[i].io_slice;
-			interrupt_required = true;
-		}
-	}
+	sgpio->reg->exchange_clock_interrupt.set   = sgpio->swap_irqs_required;
+
+	// Disable the exchange clock interrupt for all other I/O slices.
+	sgpio->reg->exchange_clock_interrupt.clear = (~sgpio->swap_irqs_required) & 0xFF;
+
+	// Clear any leftover shift interrupts from previous operations.
+	// This is necessary to ensure we don't trigger a stray interrupt if one was pending
+	// at the end of the last run.
+	sgpio->reg->exchange_clock_interrupt.clear_status = 0xffff;
 
 	// Enable the SGPIO interrupt, if it's used.
 	if (interrupt_required) {
 		platform_mark_interrupt_serviced(SGPIO_IRQ);
 		platform_enable_interrupt(SGPIO_IRQ);
 	}
+	// Otherwise, disable it, just in case.
+	else {
+		platform_disable_interrupt(SGPIO_IRQ);
+	}
 
-	sgpio_dump_configuration(LOGLEVEL_INFO, sgpio, false);
-
+	// Set up each pin for any output functions it may serve.
 	sgpio->reg->shift_clock_enable = sgpio->slices_in_use;
 	sgpio->running = true;
 }
 
+
+
+/**
+ * Halts the execution of the relevant object's SGPIO functions.
+ */
 void sgpio_halt(sgpio_t *sgpio)
 {
+	// Disable all SGPIO line shifting.
 	sgpio->reg->shift_clock_enable = 0;
 
 	// Disable all SGPIO exchange interrupts.
 	sgpio->reg->exchange_clock_interrupt.clear = 0xFFFF;
 	platform_disable_interrupt(SGPIO_IRQ);
 
+	// If we halted before a final interrupt could occur,
+	// capture that data into the relevant buffer.
+	sgpio_handle_remaining_data(sgpio);
+
+	// Finally, mark us aas not running.
 	sgpio->running = false;
 }
 
+
+/**
+ * @return true iff any SGPIO functionality is currently running
+ */
+bool sgpio_running(sgpio_t *sgpio)
+{
+	// Check each of the slices to see if they're still shifting.
+	for (int i = 0; i < SGPIO_NUM_SLICES; ++i) {
+
+		uint32_t slice_in_use = sgpio->slices_in_use & (1 << i);
+		uint32_t shift_clock_on = sgpio->reg->shift_clock_enable & (1 << i);
+		uint32_t terminates_eventually = sgpio->reg->stop_on_next_buffer_swap & (1 << i);
+
+		if (!slice_in_use) {
+			continue;
+		}
+
+		if (!terminates_eventually && shift_clock_on) {
+			return sgpio->running;
+		}
+
+		if (sgpio->reg->cycle_count[i] != 0) {
+			return true;
+		}
+
+	}
+
+	return false;
+}

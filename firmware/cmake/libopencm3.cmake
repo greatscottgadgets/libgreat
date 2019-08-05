@@ -10,6 +10,9 @@ include(ExternalProject)
 # FIXME: Don't require libopencm3 at all. >.>
 set(PATH_LIBOPENCM3 ${PATH_GREATFET_FIRMWARE}/libopencm3)
 
+
+set(ENV{FP_FLAGS} "-mfloat-abi=soft")
+
 # Specify how we build libopencm3.
 if (NOT TARGET libopencm3)
 	ExternalProject_Add(libopencm3

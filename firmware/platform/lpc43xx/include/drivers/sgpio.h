@@ -91,10 +91,12 @@ enum {
  */
 enum {
 	SGPIO_USE_PIN_DIRECTION_REGISTER   = 0x0,
-	SGPIO_DIRECTION_MODE_1BIT  = 0x4,
-	SGPIO_DIRECTION_MODE_2BIT  = 0x5,
-	SGPIO_DIRECTION_MODE_4BIT  = 0x6,
-	SGPIO_DIRECTION_MODE_8BIT  = 0x7,
+
+	// Constants for each possible bus width for bidirectional direction control.
+	SGPIO_DIRECTION_MODE_1BIT   = 0x4,
+	SGPIO_DIRECTION_MODE_2BIT   = 0x5,
+	SGPIO_DIRECTION_MODE_4BIT   = 0x6,
+	SGPIO_DIRECTION_MODE_8BIT   = 0x7,
 };
 
 /**
@@ -105,6 +107,19 @@ enum {
 	SGPIO_LOOP_2_SLICES = 1,
 	SGPIO_LOOP_4_SLICES = 1,
 	SGPIO_LOOP_8_SLICES = 1,
+};
+
+
+/**
+ * SGPIO function overrides.
+ */
+enum {
+
+	// This function prevents the given function from ever using an interrupt, even
+	// if doing so would normally break its function. This override is useful when
+	// the calling function plans to e.g. poll the SGPIO exchange status from an M0
+	// loadable, a la Rhododendron.
+	SGPIO_FUNCTION_OVERRIDE_NEVER_USE_ISR = (1 << 0)
 };
 
 
@@ -298,7 +313,7 @@ typedef volatile struct ATTR_WORD_ALIGNED {
 
 	// Slice count disable register (CTRL_DISABLE) -- controls whether the SGPIO register tracks how far into each slice
 	// it currently is.
-	uint32_t disable_double_buffering;
+	uint32_t stop_on_next_buffer_swap;
 
 	RESERVED_WORDS(823);
 
@@ -318,7 +333,7 @@ ASSERT_OFFSET(platform_sgpio_registers_t, sgpio_cycles_per_shift_clock,  0x140);
 ASSERT_OFFSET(platform_sgpio_registers_t, cycle_count,                   0x180);
 ASSERT_OFFSET(platform_sgpio_registers_t, data_buffer_swap_control,      0x1c0);
 ASSERT_OFFSET(platform_sgpio_registers_t, pattern_match_a,               0x200);
-ASSERT_OFFSET(platform_sgpio_registers_t, disable_double_buffering,      0x220);
+ASSERT_OFFSET(platform_sgpio_registers_t, stop_on_next_buffer_swap,      0x220);
 ASSERT_OFFSET(platform_sgpio_registers_t, shift_clock_interrupt,         0xF00);
 ASSERT_OFFSET(platform_sgpio_registers_t, exchange_clock_interrupt,      0xF20);
 ASSERT_OFFSET(platform_sgpio_registers_t, input_bit_match_interrupt,     0xF60);
@@ -354,6 +369,8 @@ typedef enum {
 
 
 } sgpio_clock_source_t;
+
+
 
 
 /**
@@ -410,8 +427,6 @@ typedef enum {
 	// Mode for streaming data over a set of pins that are sometimes input and sometimes output.
 	// TODO: implement this
 	SGPIO_MODE_STREAM_BIDIRECTIONAL,
-
-	// Mode for streaming data
 
 	// Uses a single SGPIO slice to generate a clock on a single SGPIO pin.
 	// Note that this is _not_ the mode to use if you want to output the clock from an existing slice -- this
@@ -472,6 +487,10 @@ typedef struct {
 	sgpio_clock_source_t shift_clock_source;
 	sgpio_capture_edge_t shift_clock_edge;
 
+	// If our shift clock source is one of the SGPIO pins, we need to specify how it should be configured
+	// in the SCU.
+	sgpio_pin_configuration_t *shift_clock_input;
+
 	// If this function is generating a clock, either for data timing or for clock generation mode,
 	// this value selects the clock's frequency, in Hz. Not used if an external clock or another slice's clock is used.
 	uint32_t shift_clock_frequency;
@@ -481,6 +500,9 @@ typedef struct {
 	sgpio_clock_qualifier_t shift_clock_qualifier;
 	bool shift_clock_qualifier_is_active_low;
 
+	// If we have a pin qualifier for SGPIO shifting, specify how to set that up in the SCU.
+	sgpio_pin_configuration_t *shift_clock_qualifier_input;
+
 	// If desired, we can output any _generated_ shift clock on one of the unused SGPIO pins.
 	// This specifies the pin on which the shift clock should be output. Provide NULL if output is not desired.
 	// This value is meaningless if .shift_clock_source is not a local counter.
@@ -488,15 +510,35 @@ typedef struct {
 
 	// Circular buffer that will contain the -packed- binary data to be scanned in or out.
 	// Must be sized to a power of two -- and the size is stored as an order -- that is, as the log2() of the size.
+	// Bidirectional modes scan the data in the buffer out, and replace it with data scanned in.
 	void *buffer;
 	uint8_t buffer_order;
 
-	// Current position in the relevant buffer.
+	// Bidirectional mode only:
+	// Circular buffer that contains direction information. For parallel busses, direction is always a packed
+	// set of two-bit values, whose lsb controls the direction of bit zero, and the msb control the direction of
+	// all other bits. For single-bit functions, this is a packed set of one-bit values that determine the direction
+	// that bit during the current cycle.
+	void *direction_buffer;
+	uint8_t direction_buffer_order;
+
+	// Current position in our buffers.
 	uint32_t position_in_buffer;
+	uint32_t position_in_direction_buffer;
+
+	// If this variable is set to a (small) non-zero value, the count will stop after a given number of shift clock
+	// cycles. This _must_ be shorter than the buffer depth in samples, to be achievable. Typically 32 or fewer is
+	// safe for a single 8-bit data operation, with the 'safe' size doubling as you halve the bus width.
+	// TODO: allow for larger shift count handling in our interrupt template body?
+	uint32_t shift_count_limit;
 
 	// Fill count -- counts the number of times the SGPIO driver has placed data into the driver.
 	// The user can decrement this when consuming data from the buffer to keep a count of "data available".
 	uint32_t data_in_buffer;
+
+	// Special use-case only override flags.
+	// These are nearly always unused.
+	uint32_t overrides;
 
 	//
 	// Set automatically by the driver -- not for user use.
@@ -505,6 +547,10 @@ typedef struct {
 	// The slice that serves as our "I/O boundary".
 	uint8_t io_slice;
 	uint8_t buffer_depth_order;
+
+	// The slice that contains the direction data currently being used.
+	uint8_t direction_slice;
+	uint8_t direction_buffer_depth_order;
 
 } sgpio_function_t;
 
@@ -567,9 +613,44 @@ void sgpio_halt(sgpio_t *sgpio);
 
 
 /**
- * FIXME: don't expose this!
+ * @return true iff any SGPIO functionality is currently running
  */
-void sgpio_dynamic_isr(void);
+bool sgpio_running(sgpio_t *sgpio);
+
+
+/**
+ * @returns a reference to the register bank for the device's SGPIO
+ */
+platform_sgpio_registers_t *platform_get_sgpio_registers(void);
+
+
+/**
+ * @returns The clock source constant for using the given pin as a clock source.
+ */
+inline sgpio_clock_source_t sgpio_clock_source_from_pin_configuration(sgpio_pin_configuration_t pin)
+{
+	switch (pin.sgpio_pin) {
+		case  8: return SGPIO_CLOCK_SOURCE_SGPIO08;
+		case  9: return SGPIO_CLOCK_SOURCE_SGPIO08;
+		case 10: return SGPIO_CLOCK_SOURCE_SGPIO08;
+		case 11: return SGPIO_CLOCK_SOURCE_SGPIO08;
+		default:
+			pr_error("sgpio: error: specified a pin that could not be used as a clock source!\n");
+			return -1;
+	}
+}
+
+
+/**
+ * Runs an SGPIO function, and blocks until it completes. (Halts the SGPIO function when complete.)
+ * Should only be used if your SGPIO function has a fixed termination condition (e.g. a shift limit).
+ */
+static inline void sgpio_run_blocking(sgpio_t *sgpio)
+{
+	sgpio_run(sgpio);
+	while(sgpio_running(sgpio));
+	sgpio_halt(sgpio);
+}
 
 
 #endif
