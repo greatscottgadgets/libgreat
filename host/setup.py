@@ -34,7 +34,7 @@ setup(
     tests_require=[''],
     install_requires=['pyusb', 'future', 'backports.functools_lru_cache'],
     description='Python library for talking with libGreat devices',
-    long_description=read('../README.md'),
+    long_description=read('README.md'),
     packages=find_packages(),
     include_package_data=True,
     platforms='any',
