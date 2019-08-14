@@ -388,10 +388,10 @@ class CommsBackend(object):
             match = re.match(cls._FORMAT_FIELD_REGEX, format_string)
 
             # If we didn't have a prefix, this is only a byte.
-            if match[1] is None:
+            if match.groups(1) is None:
                 return 1
             else:
-                return int(match[1])
+                return int(match.groups(1))
 
 
         # Sanity check: this string doesn't contain a string.
