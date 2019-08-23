@@ -18,7 +18,15 @@ import collections
 
 from . import errors
 
-from backports.functools_lru_cache import lru_cache as memoize_with_lru_cache
+try:
+    from functools import lru_cache as memoize_with_lru_cache
+except ImportError:
+    try:
+        from backports.functools_lru_cache import lru_cache as memoize_with_lru_cache
+    except ImportError:
+        # If we couldn't import functools_lru_cache, then ignore it and define a null-dcorator.
+        memoize_with_lru_cache = lambda maxsize=128, typed=False : (lambda f : f)
+
 
 
 class CommsError(IOError):
