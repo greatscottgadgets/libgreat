@@ -46,5 +46,10 @@ define_libgreat_module(scheduler
 	${PATH_LIBGREAT_FIRMWARE_DRIVERS}/scheduler.c
 )
 
+# Generic ringbuffer.
+define_libgreat_module(ringbuffer
+	${PATH_LIBGREAT_FIRMWARE_DRIVERS}/memory/ringbuffer.c
+)
+
 # FIXME: get rid of this
 add_dependencies(libgreat libopencm3)

@@ -32,6 +32,9 @@ define_libgreat_module(bsp
 
 	# Clock control / generation.
 	${PATH_LIBGREAT_FIRMWARE_PLATFORM_DRIVERS}/platform_clock.c
+
+	# Pin multiplexing control.
+	${PATH_LIBGREAT_FIRMWARE_PLATFORM_DRIVERS}/scu.c
 )
 
 
@@ -52,9 +55,14 @@ define_libgreat_module(usb_comms
 )
 
 # GPIO module.
-# TODO: move to a platform module collection?
 define_libgreat_module(gpio
 	${PATH_LIBGREAT_FIRMWARE_PLATFORM_DRIVERS}/gpio.c
+)
+
+# UART module
+define_libgreat_module(uart
+	${PATH_LIBGREAT_FIRMWARE_DRIVERS}/uart/ns16550.c
+	${PATH_LIBGREAT_FIRMWARE_PLATFORM_DRIVERS}/platform_uart.c
 )
 
 # Backtrace support.
