@@ -68,6 +68,15 @@ enum {
 
 
 /**
+ * Bootloader shadow (addr 0 physaddr) sources.
+ */
+enum {
+	BOOTLOADER_SHADOW_SPIFI = 0x80000000,
+	BOOTLOADER_SHADOW_DFU   = 0x10000000,
+};
+
+
+/**
  * Return a reference to the LPC43xx's CREG block.
  */
 platform_configuration_registers_t *get_platform_configuration_registers(void);
@@ -82,6 +91,12 @@ void platform_remap_address_zero(volatile void *base_addr);
 
 
 /**
+ * @return the physical address of the M4 core's address zero.
+ */
+uint32_t platform_get_address_zero_physaddr(void);
+
+
+/**
  * @return returns true iff the calling thread is running on the M4
  */
 bool platform_running_on_m4(void);
@@ -91,6 +106,7 @@ bool platform_running_on_m4(void);
  * @return returns true iff the calling thread is running on the M0
  */
 bool platform_running_on_m0(void);
+
 
 
 #endif

@@ -42,6 +42,16 @@ extern unsigned _text_segment_ram, _text_segment_rom;
 extern unsigned _text_segment_end, _text_segment_rom_end, _text_segment_ram_end;
 
 
+
+static bool should_relocate(void)
+{
+	// TODO: add a configuration option that allows us to run directly from SPIFI
+	// (and an associated linker script?)
+	return platform_get_address_zero_physaddr() == BOOTLOADER_SHADOW_SPIFI;
+}
+
+
+
 /**
  * Function to be called before main, but after an initializers.
  */
@@ -51,7 +61,7 @@ static void relocate_to_ram(void)
 	volatile unsigned *load_target = &_text_segment_ram;
 
 	/* If we need to relocate, relocate. */
-	if (&_text_segment_ram != &_text_segment_rom) {
+	if (should_relocate()) {
 
 		// Figure out the location that we're relocating from.
 		load_source = &_text_segment_rom_end - (&_text_segment_ram_end - load_target);

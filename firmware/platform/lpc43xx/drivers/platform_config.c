@@ -27,6 +27,17 @@ void platform_remap_address_zero(volatile void *base_addr)
 
 
 /**
+ * @return the physical address of the M4 core's address zero.
+ */
+uint32_t platform_get_address_zero_physaddr(void)
+{
+	return get_platform_configuration_registers()->m4memmap;
+}
+
+
+
+
+/**
  * @return returns true iff the calling thread is running on the M4
  */
 bool platform_running_on_m4(void)
