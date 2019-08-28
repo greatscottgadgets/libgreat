@@ -11,7 +11,7 @@
 #define __LIBGREAT_ALLOCATOR_H__
 
 // TODO: move this to a config.h?
-#define CONFIG_LIBGREAT_HEAP_SIZE (32 * 1024)
+#define CONFIG_LIBGREAT_HEAP_SIZE (16 * 1024)
 
 // Definitions from umm_malloc.
 void *umm_malloc(size_t size);
@@ -27,4 +27,4 @@ void umm_free(void *ptr);
 	static inline void free(void *ptr) { umm_free(ptr); }
 #endif
 
-#endif /* __LIBGREAT_ALLOCATOR_H __ */ 
+#endif /* __LIBGREAT_ALLOCATOR_H __ */
