@@ -26,6 +26,12 @@ typedef enum {
 	SCU_PULLDOWN   = 0b11,
 	SCU_PULLUP     = 0b00,
 	SCU_REPEATER   = 0b01,
+
+	// Platform agnostic names.
+	RESISTOR_CONFIG_NO_PULL    = 0b10,
+	RESISTOR_CONFIG_PULLDOWN   = 0b11,
+	RESISTOR_CONFIG_PULLUP     = 0b00,
+	RESISTOR_CONFIG_KEEPER     = 0b01,
  } scu_resistor_configuration_t;
 
 

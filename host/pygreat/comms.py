@@ -931,6 +931,17 @@ class CommsBackend(object):
         return CommandFailureError(message)
 
 
+    def get_exclusive_access(self):
+        """ When possible, attempts to ensure exclusive access to the device.
+
+        In some backends, this enables optimizations.
+        """
+        pass
+
+
+    def release_exclusive_access(self):
+        """ Releases any exclusive access we hold. """
+        pass
 
 
 class CommsApiCollection(object):
