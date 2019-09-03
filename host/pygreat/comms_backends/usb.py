@@ -433,3 +433,14 @@ class USBCommsBackend(CommsBackend):
         """
         usb.util.dispose_resources(self.device)
 
+
+    def still_connected(self):
+        """ Attempts to detect if the device is still connected. Returns true iff it is. """
+
+        USB_ERROR_NO_SUCH_DEVICE = 19
+
+        try:
+            self.device.is_kernel_driver_active(0)
+            return True
+        except usb.core.USBError as e:
+            return e.errno != USB_ERROR_NO_SUCH_DEVICE

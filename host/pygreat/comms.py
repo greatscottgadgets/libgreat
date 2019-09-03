@@ -1286,6 +1286,15 @@ class CommsClass(object):
                 encoding, max_response_length, comms_timeout, pretty_name, rephrase_errors)
 
 
+    def still_connected(self):
+        """ Attempts to detect if the device is still connected. Returns true iff it is. """
+
+        # Assume the device is connected by default, in case we can't passively detect this.
+        # Subclasses should override this with a more useful detection strategy.
+        return True
+
+
+
 class GeneratedCommsClass(CommsClass):
     """ Special variant of CommsClass used as the parent of procedurally-
         genereated CommsClass. Can be used to differentiate automatically and
