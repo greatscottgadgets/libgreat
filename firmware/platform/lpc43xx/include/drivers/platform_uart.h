@@ -22,6 +22,13 @@ typedef enum {
 	UART3 = 3,
 } uart_number_t;
 
+/**
+ * General UART constants.
+ */
+enum {
+	NUM_UARTS = 4
+};
+
 
 /**
  * Register layout for LPC43xx UARTs.

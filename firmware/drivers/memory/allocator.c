@@ -12,6 +12,9 @@
 
 #include <drivers/memory/allocator.h>
 
+// General buffer for large allocations.
+uint8_t large_allocation_buffer[8192] ATTR_SECTION(".bss.heap");
+
 // Initialization import from the UMM library.
 void umm_init(void);
 

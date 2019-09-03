@@ -14,27 +14,14 @@
 #include <drivers/uart.h>
 #include <drivers/arm_system_control.h>
 
-// FIXME: switch to the libgreat NVIC driver, which hasn't been merged in yet
-#include <libopencm3/lpc43xx/m4/nvic.h>
-#include <libopencm3/cm3/vector.h>
-
-#define pr_debug pr_info
-
 typedef enum {
 	IRQ_RECEIVE_DATA_AVAILABLE = 0x2,
 } pending_interrupt_t;
 
-// Forward declaration.
-void platform_uart_interrupt(void);
-
-
-// FIXME HACK: this should be multiple stored objects tracked by the platform code!
-uart_t *current_uart;
 
 // FIXME HACK: statically allocate UART buffers
 static uint8_t uart_rx_buffer[256];
 static uint8_t uart_tx_buffer[256];
-
 
 static uint32_t divide_and_round(uint32_t numerator, uint32_t denominator)
 {
@@ -46,7 +33,6 @@ static uint32_t divide_and_round(uint32_t numerator, uint32_t denominator)
 	// Return a rounded version of the relevant division. This works because we're in fixed-point;
 	// we effectively add 0.5, and the truncate to an integer by removing the digit past our binary point. :)
 	return (twice_dividend + 1) / 2;
-
 }
 
 
@@ -205,11 +191,6 @@ uint32_t uart_set_baud_rate(uart_t *uart, uint32_t baud_rate)
  */
 int uart_init(uart_t *uart)
 {
-	const uint32_t irq_numbers[] = {
-		NVIC_USART0_IRQ, NVIC_UART1_IRQ, NVIC_USART2_IRQ, NVIC_USART3_IRQ
-	};
-	uint32_t irq_number;
-
 	// Perform the platform-specific initialization for the given UART.
 	int rc = platform_uart_init(uart);
 	if (rc) {
@@ -252,9 +233,6 @@ int uart_init(uart_t *uart)
 	// Enable transmission.
 	uart->reg->enable_transmit = true;
 
-	// Store a reference to this UART object, so we can access it in interrupts.
-	// FIXME: move this to our platform code!
-
 	// If we're going to allocate a buffer, we can perform asynchronous reads and writes.
 	// Accordingly, we'll set up interrupts to fill / drain the rx and tx buffers.
 	if (uart->buffer_size) {
@@ -265,7 +243,7 @@ int uart_init(uart_t *uart)
 
 		// ... and for our tx buffer.
 		// FIXME: malloc this!
-		ringbuffer_init(&uart->tx_buffer, uart_rx_buffer, uart->buffer_size);
+		ringbuffer_init(&uart->tx_buffer, uart_tx_buffer, uart->buffer_size);
 
 		// If we couldn't allocate either buffer, disable synchronous operations and return a warning code.
 		if (!uart->rx_buffer.buffer || !uart->tx_buffer.buffer) {
@@ -279,19 +257,14 @@ int uart_init(uart_t *uart)
 			return ENOMEM;
 		}
 
+		// Set up an interrupt to handle UART interrupt events.
+		rc = platform_uart_set_up_interrupt(uart);
+		if (rc) {
+			return rc;
+		}
 
-		// Enable an interrupt when we receive data, both locally...
+		// Enable an interrupt when we receive data; which will be used to populate our ring buffer.
 		uart->reg->receive_data_available_interrupt_enabled = true;
-
-		// XXX HACK XXX
-		current_uart = uart;
-
-		// ... and in the NVIC.
-		// FIXME: move this LPC-specific code into the platform driver!
-		irq_number = irq_numbers[uart->number];
-		vector_table.irq[irq_number] = platform_uart_interrupt;
-		nvic_enable_irq(irq_number);
-
 	}
 
 	return 0;
@@ -306,6 +279,9 @@ void uart_data_ready_interrupt(uart_t *uart)
 
 
 
+/**
+ * Function called as the main handler for a UART interrupt.
+ */
 void uart_interrupt(uart_t *uart)
 {
 	// If there are no UART interrupts pending, there's nothing to do.
@@ -318,7 +294,6 @@ void uart_interrupt(uart_t *uart)
 	if(uart->reg->pending_interrupt == IRQ_RECEIVE_DATA_AVAILABLE) {
 		uart_data_ready_interrupt(uart);
 	}
-
 }
 
 
@@ -345,8 +320,6 @@ size_t uart_read(uart_t *uart, void *buffer, size_t count)
 		return 0;
 	}
 
-	pr_info("data available: %d\n", ringbuffer_data_available(&uart->rx_buffer));
-
 	// Read count bytes from the buffer, or as much as is available.
 	for (unsigned i = 0; i < count; ++i) {
 		if (ringbuffer_empty(&uart->rx_buffer)) {
@@ -361,12 +334,6 @@ size_t uart_read(uart_t *uart, void *buffer, size_t count)
 	return data_read;
 }
 
-
-// FIXME: replace this hack with code in the platform driver!
-void platform_uart_interrupt(void)
-{
-	uart_interrupt(current_uart);
-}
 
 
 /**

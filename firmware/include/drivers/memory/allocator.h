@@ -10,6 +10,9 @@
 #ifndef __LIBGREAT_ALLOCATOR_H__
 #define __LIBGREAT_ALLOCATOR_H__
 
+// FIXME: use an allocation function to manage use of this
+extern uint8_t large_allocation_buffer[8192];
+
 // TODO: move this to a config.h?
 #define CONFIG_LIBGREAT_HEAP_SIZE (16 * 1024)
 

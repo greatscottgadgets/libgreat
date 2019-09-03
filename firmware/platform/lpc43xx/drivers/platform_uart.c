@@ -6,9 +6,17 @@
 
 #include <debug.h>
 
-#include <drivers/uart.h>
-#include <drivers/platform_clock.h>
 #include <drivers/scu.h>
+#include <drivers/uart.h>
+#include <drivers/arm_vectors.h>
+#include <drivers/platform_clock.h>
+
+//
+// Stores a reference to each active UART object.
+// Used to grab the relevant UART object for its interrupt.
+//
+uart_t *active_uart_objects[4];
+
 
 typedef struct {
 
@@ -49,7 +57,9 @@ uart_pins_t uart_pins[] = {
 };
 
 
-
+// Imports from the local UART driver. These aren't part of the public API,
+// so they're not defined in uart.h.
+void uart_interrupt(uart_t *uart);
 
 
 /**
@@ -111,6 +121,63 @@ int platform_uart_init(uart_t *uart)
 	// Connect our UART pins to the UART hardware.
 	platform_scu_configure_pin_uart(pins.tx.group, pins.tx.pin, pins.tx.function);
 	platform_scu_configure_pin_uart(pins.rx.group, pins.rx.pin, pins.rx.function);
+
+	return 0;
+}
+
+
+/**
+ * Low-level UART interrupt handlers.
+ * These grab the active UART object for the relevant interrupt, and call the main ISR.
+ */
+
+static void platform_uart0_interrupt(void)
+{
+	uart_interrupt(active_uart_objects[0]);
+}
+
+static void platform_uart1_interrupt(void)
+{
+	uart_interrupt(active_uart_objects[1]);
+}
+
+static void platform_uart2_interrupt(void)
+{
+	uart_interrupt(active_uart_objects[2]);
+}
+
+static void platform_uart3_interrupt(void)
+{
+	uart_interrupt(active_uart_objects[3]);
+}
+
+
+
+
+/**
+ * Performs platform-specific initialization for the system's UART interrupt.
+ */
+int platform_uart_set_up_interrupt(uart_t *uart)
+{
+	uint32_t irq_number;
+
+	// Look-up table of per-UART interrupt handlers.
+	const vector_table_entry_t irq_handlers[] = {
+		platform_uart0_interrupt, platform_uart1_interrupt,
+		platform_uart2_interrupt, platform_uart3_interrupt
+	};
+
+	const uint32_t irq_numbers[] = {
+		USART0_IRQ, UART1_IRQ, USART2_IRQ, USART3_IRQ
+	};
+
+	// Store the current UART object, so we can find it during our interrupt handler.
+	active_uart_objects[uart->number] = uart;
+
+	// Enable the relevant interrupt in the NVIC.
+	irq_number = irq_numbers[uart->number];
+	vector_table.irqs[irq_number] = irq_handlers[uart->number];
+	platform_enable_interrupt(irq_number);
 
 	return 0;
 }

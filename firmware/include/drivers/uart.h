@@ -105,6 +105,12 @@ uint32_t platform_uart_get_parent_clock_frequency(uart_t *uart);
 
 
 /**
+ * Performs platform-specific initialization for the system's UART interrupt.
+ */
+int platform_uart_set_up_interrupt(uart_t *uart);
+
+
+/**
  * Perform a UART transmit, but block until the transmission is accepted.
  */
 void uart_transmit_synchronous(uart_t *uart, uint8_t byte);

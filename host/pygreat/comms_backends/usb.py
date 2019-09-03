@@ -326,7 +326,7 @@ class USBCommsBackend(CommsBackend):
                 to_send = prelude + bytes(data)
 
                 if len(to_send) > self.LIBGREAT_MAX_COMMAND_SIZE:
-                    raise ArgumentError("Command payload is too long!")
+                    raise ValueError("Command payload is too long!")
 
             # Otherwise, just send the prelude.
             else:
@@ -413,7 +413,7 @@ class USBCommsBackend(CommsBackend):
                 self.LIBGREAT_REQUEST_NUMBER, self.LIBGREAT_VALUE_CANCEL, 0,
                 self.LIBGREAT_ERRNO_SIZE, timeout)
 
-        # And try executing the abort progressively, mutiple times.
+        # And try executing the abort progressively, multiple times.
         try:
             result = execute_abort(self.device)
         except:
