@@ -1390,8 +1390,6 @@ int sgpio_set_up_functions(sgpio_t *sgpio)
  */
 void sgpio_run(sgpio_t *sgpio)
 {
-	bool interrupt_required = false;
-
 	// Make sure we're not actively shifting while we handle data prepopulation.
 	sgpio->reg->shift_clock_enable = 0;
 
@@ -1409,8 +1407,10 @@ void sgpio_run(sgpio_t *sgpio)
 	// at the end of the last run.
 	sgpio->reg->exchange_clock_interrupt.clear_status = 0xffff;
 
+
 	// Enable the SGPIO interrupt, if it's used.
-	if (interrupt_required) {
+	if (sgpio->swap_irqs_required) {
+		pr_debug("enabling IRQ\n");
 		platform_mark_interrupt_serviced(SGPIO_IRQ);
 		platform_enable_interrupt(SGPIO_IRQ);
 	}

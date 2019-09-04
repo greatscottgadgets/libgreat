@@ -605,6 +605,7 @@ int sgpio_generate_data_shuttle_isr(sgpio_t *sgpio)
 
 	// If we have a data ISR, install it as our interrupt handler.
 	if(master_isr) {
+		pr_debug("sgpio: installing interrupt handler at %p\n", master_isr);
 		platform_set_interrupt_handler(SGPIO_IRQ, master_isr);
 	}
 
