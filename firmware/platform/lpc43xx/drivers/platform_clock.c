@@ -1137,22 +1137,6 @@ bool platform_nominal_frequency_within_tolerance(uint32_t frequency_nominal,
 
 }
 
-/**
- @return true iff the given frequency is within a tolerance of its nominal value
- */
-bool platform_nominal_frequency_within_tolerance(uint32_t frequency_nominal,
-		uint32_t frequency_measured, uint32_t tolerance_percent)
-{
-	float tolerance_max = (100.0 + tolerance_percent) / 100.0;
-	float tolerance_min = (100.0 - tolerance_percent) / 100.0;
-
-	uint32_t max_allowable = tolerance_max * frequency_nominal;
-	uint32_t min_allowable = tolerance_min * frequency_nominal;
-
-	return (frequency_measured <= max_allowable) && (frequency_measured >= min_allowable);
-
-}
-
 
 /**
  * Verifies the frequency of a given clock source; this also sets our
@@ -1175,7 +1159,7 @@ static int platform_verify_source_frequency(clock_source_t source)
 	}
 
 	// If the given source is 0 Hz and it's not supposed to be, return an error.
-	// TODO: valdiate that this is close enough to the specified frequency,
+	// TODO: validate that this is close enough to the specified frequency,
 	// instead
 	if (config->frequency && !config->frequency_actual) {
 		pr_error("error: clock: clock %s (%d) did not come up correctly! (actual "
@@ -1241,9 +1225,6 @@ static int platform_ensure_main_xtal_is_up(void)
 
 	// Wait 250us.
 	delay_us(250UL);
-
-	// XXX
-	delay_us(250UL * 10);
 
 	// Success!
 	return platform_verify_source_frequency(CLOCK_SOURCE_XTAL_OSCILLATOR);
@@ -1475,7 +1456,8 @@ static void platform_soft_start_cpu_clock(void)
 	// Per the user manual, we need to soft start if the relevant frequency is  >=
 	// 110 MHz [13.2.1.1]. This means holding the relevant base clock at
 	// half-frequency for 50uS.
-	const uint32_t soft_start_cutoff   = 110 * MHZ;
+	const uint32_t soft_start_cutoff      = 110 * MHZ;
+	const uint32_t soft_start_nudge_point = 192 * MHZ;
 	const uint32_t soft_start_duration = 50;
 
 	platform_clock_generation_register_block_t *cgu = get_platform_clock_generation_registers();
@@ -1487,6 +1469,8 @@ static void platform_soft_start_cpu_clock(void)
 
 	// And read the source clock's target frequency.
 	uint32_t source_frequency = platform_clock_source_configurations[parent_clock].frequency;
+	uint32_t target_frequency = source_frequency;
+
 
 	// If this clock is going to run at a frequency low enough that we don't have
 	// to soft-start it, we'll abort here and let the normal configuration bring
@@ -1494,6 +1478,14 @@ static void platform_soft_start_cpu_clock(void)
 	if (source_frequency < soft_start_cutoff) {
 		return;
 	}
+
+
+	// If this clock would be running at a frequency greater than 192MHz, there's an
+	// interesting ... er, behavior ... that we have to watch out for.
+	if (source_frequency > soft_start_nudge_point) {
+		source_frequency = soft_start_nudge_point;
+	}
+
 
 	// For now, we only support soft-starting off of PLL1.
 	// TODO: support soft-starting via other clocks, perhaps using an integer
@@ -1552,7 +1544,12 @@ static void platform_soft_start_cpu_clock(void)
 		;
 
 	platform_handle_base_clock_frequency_change(&cgu->m4);
-	pr_debug("clock: CPU is now running at our target speed of %" PRIu32 "\n", source_frequency);
+	pr_debug("clock: CPU is now running at our soft-start speed of %" PRIu32 "\n", source_frequency);
+
+	// If we're not yet to our target frequency, schedule the system for a regular PLL bringup.
+	if (target_frequency != source_frequency) {
+		platform_bring_up_main_pll(target_frequency);
+	}
 }
 
 /**
@@ -1609,7 +1606,7 @@ static int platform_bring_up_main_pll(uint32_t frequency)
 
 	// Decouple ourselves from configuration of the clock, so we can adjust it
 	// without worrying about it blocking.
-	cgu->pll1.block_during_frequency_changes = 0;
+	cgu->pll1.block_during_frequency_changes = 1;
 
 	// Set the source for the relevant PLL.
 	input_frequency = set_source_for_generated_clock(CLOCK_SOURCE_PLL1);
