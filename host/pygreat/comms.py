@@ -399,8 +399,10 @@ class CommsBackend(object):
             if match.groups(1) is None:
                 return 1
             else:
-                return int(match.groups(1))
-
+                val_ret = match.groups(1) # returned value
+                if type(val_ret).__name__ == 'tuple': # take the first element if it returns a tuple
+                    val_ret = val_ret[0]
+                return int(val_ret)
 
         # Sanity check: this string doesn't contain a string.
         if ('S' in format_string) or ('X' in format_string) or ('*' in format_string):
