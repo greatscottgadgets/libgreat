@@ -579,12 +579,23 @@ void platform_initialize_early_clocks(void);
 /**
  * Uses the LPC43xx's internal frequency monitor to detect the frequency of the given clock source.
  * If trying to determine the internal clock frequency, the external oscillator must be up, as it will
- * be used as the refernece clock.
+ * be used as the reference clock.
  *
  * @param source The source to be meausred.
  * @return The relevant frequency, in Hz, or 0 if the given clock is too low to measure.
  */
 uint32_t platform_detect_clock_source_frequency(clock_source_t clock_to_detect);
+
+
+/**
+ * Uses the LPC43xx's internal frequency monitor to detect the frequency of the given clock source.
+ * If trying to determine the internal clock frequency, the external oscillator must be up, as it will
+ * be used as the reference clock.
+ *
+ * @param source The source to be meausred.
+ * @return The relevant frequency, in Hz, or 0 if the given clock is too low to measure.
+ */
+uint32_t platform_detect_clock_source_frequency_directly(clock_source_t clock_to_detect);
 
 
 /**
