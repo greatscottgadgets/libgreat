@@ -395,11 +395,19 @@ class CommsBackend(object):
             # Parse the format string, extracting the relevant fields.
             match = re.match(cls._FORMAT_FIELD_REGEX, format_string)
 
+            repeat_prefix = match.groups(1)
+
             # If we didn't have a prefix, this is only a byte.
-            if match.groups(1) is None:
+            if repeat_prefix is None:
                 return 1
             else:
-                return int(match.groups(1))
+
+                # In Python 3, match.groups() returns a tuple.
+                # In Python 2, match.groups() returns an int.
+                if hasattr(repeat_prefix, "__getitem__"):
+                    return int(repeat_prefix[0])
+                else:
+                    return int(match.groups(1))
 
 
         # Sanity check: this string doesn't contain a string.
