@@ -80,6 +80,17 @@ typedef volatile struct ATTR_PACKED {
 
 
 /**
+ * Collection that contains sets of {SCU group, SCU pin, SCU function}; used
+ * so subordinate drivers and code can specify lists of utilized pin mappings.
+ */
+ typedef struct {
+	 uint8_t group;
+	 uint8_t pin;
+	 uint8_t function;
+} scu_function_mapping_t;
+
+
+/**
  * @return a reference to the platform's SCU registers
  */
 platform_scu_registers_t *platform_get_scu_registers(void);
@@ -95,6 +106,18 @@ platform_scu_registers_t *platform_get_scu_registers(void);
  * @param configuration The configuration to be applied. See platform_scu_pin_configuration_t for more information.
  */
 void platform_scu_configure_pin(uint8_t group, uint8_t pin, platform_scu_pin_configuration_t configuration);
+
+
+/**
+ * Convenience variant of `platform_scu_configure_pin` that accepts its group, pin, and function
+ * from a scu_function_mapping_t object.
+ *
+ * @param mapping A mapping object containing the port, pin, and function to be applied.
+ * @param configuration The configuration to be applied -- its function field is ignored, as the
+ *     mapping field provides that.
+ */
+void platform_scu_apply_mapping(scu_function_mapping_t mapping, platform_scu_pin_configuration_t configuration);
+
 
 /**
  * Configures a given pin, applying the options that make the most sense for a normal (<30MHz) GPIO.
@@ -123,7 +146,7 @@ void platform_scu_configure_pin_fast_io(uint8_t group, uint8_t pin, uint8_t func
 
 
 /**
- * Configures a given pin, applying the options that make the most sense for a common UART>
+ * Configures a given pin, applying the options that make the most sense for a common UART.
  *
  * @param group The SCU group for the pin to be configured. This is the first number, X, in the LPC PX_Y naming scheme.
  * @param pin The SCU pin number for the pin to be configured. This is the second number, Y, in the
@@ -131,5 +154,9 @@ void platform_scu_configure_pin_fast_io(uint8_t group, uint8_t pin, uint8_t func
  * @param function The function number to set the given pin to UART.
  */
 void platform_scu_configure_pin_uart(uint8_t group, uint8_t pin, uint8_t function);
+
+
+
+
 
 #endif

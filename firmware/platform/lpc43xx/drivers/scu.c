@@ -34,6 +34,26 @@ void platform_scu_configure_pin(uint8_t group, uint8_t pin, platform_scu_pin_con
 	scu->group[group].pin[pin] = configuration;
 }
 
+
+/**
+ * Convenience variant of `platform_scu_configure_pin` that accepts its group, pin, and function
+ * from a scu_function_mapping_t object.
+ *
+ * @param mapping A mapping object containing the port, pin, and function to be applied.
+ * @param configuration The configuration to be applied -- its function field is ignored, as the
+ *     mapping field provides that.
+ */
+void platform_scu_apply_mapping(scu_function_mapping_t mapping, platform_scu_pin_configuration_t configuration)
+{
+	// Apply the function from our mapping to our configuration object...
+	configuration.function = mapping.function;
+
+	// ... and call our main configuration function.
+	platform_scu_configure_pin(mapping.group, mapping.pin, configuration);
+}
+
+
+
 /**
  * Configures a given pin, applying the options that make the most sense for a normal (<30MHz) GPIO.
  *
