@@ -113,9 +113,10 @@ void usb_set_address_deferred(
 );
 
 void usb_endpoint_init_without_descriptor(
-	const usb_endpoint_t* const endpoint,
-  uint_fast16_t max_packet_size,
-  usb_transfer_type_t transfer_type
+	usb_endpoint_t* const endpoint,
+	uint_fast16_t max_packet_size,
+	usb_transfer_type_t transfer_type,
+	bool manual_zlps
 );
 
 void usb_in_endpoint_enable_nak_interrupt(

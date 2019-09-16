@@ -833,10 +833,13 @@ void usb_copy_setup(usb_setup_t* const dst, const volatile uint8_t* const src) {
 
 
 void usb_endpoint_init_without_descriptor(
-	const usb_endpoint_t* const endpoint,
-  uint_fast16_t max_packet_size,
-  usb_transfer_type_t transfer_type
-) {
+		usb_endpoint_t* const endpoint,
+		uint_fast16_t max_packet_size,
+		usb_transfer_type_t transfer_type,
+		bool manual_zlps)
+{
+	bool zero_length_terminate = (transfer_type == USB_TRANSFER_TYPE_CONTROL) && !manual_zlps;
+
 	usb_endpoint_flush(endpoint);
 
 	// TODO: There are more capabilities to adjust based on the endpoint
@@ -846,7 +849,7 @@ void usb_endpoint_init_without_descriptor(
 		= USB_QH_CAPABILITIES_MULT(0)
 		| USB_QH_CAPABILITIES_MPL(max_packet_size)
 		| ((transfer_type == USB_TRANSFER_TYPE_CONTROL) ? USB_QH_CAPABILITIES_IOS : 0)
-		| ((transfer_type == USB_TRANSFER_TYPE_CONTROL) ? 0 : USB_QH_CAPABILITIES_ZLT);
+		| ((zero_length_terminate) ? 0 : USB_QH_CAPABILITIES_ZLT);
 	qh->current_dtd_pointer = 0;
 	qh->next_dtd_pointer = USB_TD_NEXT_DTD_POINTER_TERMINATE;
 	qh->total_bytes
@@ -863,6 +866,8 @@ void usb_endpoint_init_without_descriptor(
 	qh->_reserved_0 = (uint32_t)endpoint;
 
 	usb_endpoint_set_type(endpoint, transfer_type);
+
+	endpoint->max_packet_size = max_packet_size;
 
 	usb_endpoint_enable(endpoint);
 }
@@ -905,7 +910,7 @@ void usb_endpoint_init(
 		transfer_type = usb_endpoint_descriptor_transfer_type(endpoint_descriptor);
 	}
 
-  usb_endpoint_init_without_descriptor(endpoint, max_packet_size, transfer_type);
+  usb_endpoint_init_without_descriptor(endpoint, max_packet_size, transfer_type, false);
 
 }
 

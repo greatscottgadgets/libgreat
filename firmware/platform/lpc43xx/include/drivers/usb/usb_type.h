@@ -270,6 +270,7 @@ struct usb_endpoint_t {
 	usb_setup_t setup;
 	uint8_t buffer[8];	// Buffer for use during IN stage.
 	const uint_fast8_t address;
+	uint16_t max_packet_size;
 	usb_peripheral_t* device;
 	usb_endpoint_t* const in;
 	usb_endpoint_t* const out;
