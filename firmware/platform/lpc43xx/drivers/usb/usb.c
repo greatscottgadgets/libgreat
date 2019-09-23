@@ -840,6 +840,11 @@ void usb_endpoint_init_without_descriptor(
 {
 	bool zero_length_terminate = (transfer_type == USB_TRANSFER_TYPE_CONTROL) && !manual_zlps;
 
+	// IN EP0 needs non-automatic-ZLPs to work around a Linux spec violation.
+	if (endpoint->address == 0) {
+		zero_length_terminate = false;
+	}
+
 	usb_endpoint_flush(endpoint);
 
 	// TODO: There are more capabilities to adjust based on the endpoint
