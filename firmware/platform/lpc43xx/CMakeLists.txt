@@ -68,6 +68,12 @@ define_libgreat_module(uart
 	${PATH_LIBGREAT_FIRMWARE_PLATFORM_DRIVERS}/platform_uart.c
 )
 
+# DAC module
+define_libgreat_module(dac
+	${PATH_LIBGREAT_FIRMWARE_DRIVERS}/dac.c
+	${PATH_LIBGREAT_FIRMWARE_PLATFORM_DRIVERS}/platform_dac.c
+)
+
 # GPIO module.
 define_libgreat_module(sgpio
 	${PATH_LIBGREAT_FIRMWARE_PLATFORM_DRIVERS}/sgpio.c
