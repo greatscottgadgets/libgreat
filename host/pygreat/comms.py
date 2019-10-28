@@ -45,7 +45,7 @@ class CommsBackend(object):
     LIBGREAT_MAX_COMMAND_SIZE = 4096
 
     """ Regular expression that identifies special fields for .pack and .unpack. """
-    _SPECIAL_FIELD_REGEX = r"((?:[\d*]*[SX])|(?:\*\w)|(?:[\d*]*\([cbB?hHiIlLqQfdspPSX]+\)))"
+    _SPECIAL_FIELD_REGEX = r"((?:[\d*]*[SX])|(?:\*[\w?])|(?:[\d*]*\([cbB?hHiIlLqQfdspPSX]+\)))"
 
     """ Regular expression that splits the parts of a .pack / .unpack format expression. """
     _FORMAT_FIELD_REGEX = r"([\d*]*)(?:([cbB?hHiIlLqQfdspPSX])|(?:\(([cbB?hHiIlLqQfdspPSX]+)\)))"
