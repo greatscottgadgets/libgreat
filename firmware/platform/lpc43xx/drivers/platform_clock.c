@@ -1448,6 +1448,32 @@ static int platform_configure_main_pll_parameters(uint32_t target_frequency, uin
 }
 
 /**
+ * Method meant to aide in soft-staring the CPU clock. Brings the CPU to a given frequency if that
+ * frequency is on the path to the provided target frequency.
+ */
+static void platform_nudge_cpu_frequency_through(uint32_t frequency, uint32_t target_frequency)
+{
+	if (target_frequency > frequency) {
+		platform_bring_up_main_pll(frequency);
+	}
+}
+
+
+/**
+ * Workaround for a silicon bug in which the CPU is allowed to execute before the PLL settles fully,
+ * even when the option to block until PLL lock is used. We slowly step the frequency up through some
+ * fixed points, ensuring the gradual rise keeps ringing to a minimum.
+ */
+static void platform_step_up_cpu_frequency_to(uint32_t target_frequency)
+{
+	platform_nudge_cpu_frequency_through(144 * MHZ, target_frequency);
+	platform_nudge_cpu_frequency_through(168 * MHZ, target_frequency);
+	platform_nudge_cpu_frequency_through(192 * MHZ, target_frequency);
+	platform_bring_up_main_pll(target_frequency);
+}
+
+
+/**
  */
 static void platform_soft_start_cpu_clock(void)
 {
@@ -1457,7 +1483,7 @@ static void platform_soft_start_cpu_clock(void)
 	// 110 MHz [13.2.1.1]. This means holding the relevant base clock at
 	// half-frequency for 50uS.
 	const uint32_t soft_start_cutoff      = 110 * MHZ;
-	const uint32_t soft_start_nudge_point = 192 * MHZ;
+	const uint32_t soft_start_nudge_point = 120 * MHZ;
 	const uint32_t soft_start_duration = 50;
 
 	platform_clock_generation_register_block_t *cgu = get_platform_clock_generation_registers();
@@ -1546,10 +1572,11 @@ static void platform_soft_start_cpu_clock(void)
 	platform_handle_base_clock_frequency_change(&cgu->m4);
 	pr_debug("clock: CPU is now running at our soft-start speed of %" PRIu32 "\n", source_frequency);
 
-	// If we're not yet to our target frequency, schedule the system for a regular PLL bringup.
+	// If we're not yet to our target frequency, gradually step the CPU frequency up to that point.
 	if (target_frequency != source_frequency) {
-		platform_bring_up_main_pll(target_frequency);
+		platform_step_up_cpu_frequency_to(target_frequency);
 	}
+
 }
 
 /**
