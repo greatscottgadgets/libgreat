@@ -40,7 +40,7 @@ typedef struct timer {
 	// Platform-specific data.
 	platform_timer_data_t platform_data;
 
-} timer_t;
+} hw_timer_t;
 
 
 
@@ -52,13 +52,13 @@ typedef struct timer {
  * @param timer A timer object that will be populated automatically once acquired.
  * @return 0 on success, or an error code if no timer could be acquired
  */
-uint32_t acquire_timer(timer_t *timer);
+uint32_t acquire_timer(hw_timer_t *timer);
 
 
 /**
  * Releases a timer reserved with acquire_timer.
  */
-void release_timer(timer_t *timer);
+void release_timer(hw_timer_t *timer);
 
 
 /**
@@ -67,7 +67,7 @@ void release_timer(timer_t *timer);
  * @param timer The timer object to be initialized.
  * @param index The number of the timer to be set up. Platform-specific, but usually a 0-indexed integer.
  */
-void timer_initialize(timer_t *timer, timer_index_t index);
+void timer_initialize(hw_timer_t *timer, timer_index_t index);
 
 /**
  * Initialization function for the platform microsecond timer, which is used
@@ -104,7 +104,13 @@ uint32_t get_time_since(uint32_t base);
  * @param function The function to be called. Should return void and accept a void*.
  * @param argument The argument to be provided to the given function.
  */
-uint32_t call_function_periodically(timer_t *timer, uint32_t frequency, timer_callback_t function, void *argument);
+uint32_t call_function_periodically(hw_timer_t *timer, uint32_t frequency, timer_callback_t function, void *argument);
+
+
+/**
+ * Cancels all periodic function calls associated with a given timer.
+ */
+uint32_t cancel_periodic_function_calls(hw_timer_t *timer);
 
 
 /**
@@ -125,7 +131,7 @@ void handle_platform_timer_frequency_change(void);
  * @param timer The timer object to be initialized.
  * @param index The number of the timer to be set up.
  */
-void platform_timer_initialize(timer_t *timer, timer_index_t index);
+void platform_timer_initialize(hw_timer_t *timer, timer_index_t index);
 
 
 /**
@@ -134,32 +140,32 @@ void platform_timer_initialize(timer_t *timer, timer_index_t index);
  * @param timer The timer to be configured.
  * @param tick_frequency The timer's tick frequency, in Hz.
  */
-void platform_timer_set_frequency(timer_t *timer, uint32_t tick_frequency);
+void platform_timer_set_frequency(hw_timer_t *timer, uint32_t tick_frequency);
 
 
 /**
  * Enables the given timer. Typically, you want to configure the timer
  * beforehand with calls to e.g. platform_timer_set_frequency.
  */
-void platform_timer_enable(timer_t *timer);
+void platform_timer_enable(hw_timer_t *timer);
 
 
 /**
  * Disables the given timer.
  */
-void platform_timer_disable(timer_t *timer);
+void platform_timer_disable(hw_timer_t *timer);
 
 
 /**
  * @returns the current counter value of the given timer
  */
-uint32_t platform_timer_get_value(timer_t *timer);
+uint32_t platform_timer_get_value(hw_timer_t *timer);
 
 
 /**
  * @returns A reference to the system's platform timer -- initializing the relevant timer, if needed.
  */
-timer_t *platform_get_platform_timer(void);
+hw_timer_t *platform_get_platform_timer(void);
 
 
 /**
@@ -167,20 +173,20 @@ timer_t *platform_get_platform_timer(void);
  *
  * @returns A reference to the system's platform timer.
  */
-timer_t *platform_set_up_platform_timer(void);
+hw_timer_t *platform_set_up_platform_timer(void);
 
 
 /**
  * Sets up a timer to handle any periodic callbacks associated with it.
  * Requires the platform-independent driver to have populated its interval callback fields.
  */
-uint32_t platform_schedule_periodic_callbacks(timer_t *timer);
+uint32_t platform_schedule_periodic_callbacks(hw_timer_t *timer);
 
 
 /**
  * Cancels all periodic callbacks associated with the given timer.
  */
-uint32_t platform_cancel_periodic_callbacks(timer_t *timer);
+uint32_t platform_cancel_periodic_callbacks(hw_timer_t *timer);
 
 
 /**

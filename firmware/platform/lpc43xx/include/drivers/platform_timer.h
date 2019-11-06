@@ -11,7 +11,7 @@
 
 #include <drivers/platform_clock.h>
 
-typedef struct timer timer_t;
+typedef struct timer hw_timer_t;
 
 /**
  * Timer numbers for each of the LPC43xx timer peripherals.

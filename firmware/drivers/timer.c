@@ -19,7 +19,7 @@
  * @param timer A timer object that will be populated automatically once acquired.
  * @return 0 on success, or an error code if no timer could be acquired
  */
-uint32_t acquire_timer(timer_t *timer)
+uint32_t acquire_timer(hw_timer_t *timer)
 {
 	timer_index_t index = platform_reserve_free_timer();
 
@@ -39,7 +39,7 @@ uint32_t acquire_timer(timer_t *timer)
  * @param timer The timer object to be initialized.
  * @param index The number of the timer to be set up.
  */
-void timer_initialize(timer_t *timer, timer_index_t index)
+void timer_initialize(hw_timer_t *timer, timer_index_t index)
 {
 	timer->number = index;
 
@@ -51,7 +51,7 @@ void timer_initialize(timer_t *timer, timer_index_t index)
 /**
  * Enables the given timer and sets it to tick at a given frequency.
  */
-void timer_enable(timer_t *timer, uint32_t tick_frequency)
+void timer_enable(hw_timer_t *timer, uint32_t tick_frequency)
 {
 	// Store the timer's frequency, for later use.
 	timer->frequency = tick_frequency;
@@ -65,7 +65,7 @@ void timer_enable(timer_t *timer, uint32_t tick_frequency)
 /**
  * @returns the current counter value of the given timer
  */
-uint32_t timer_get_value(timer_t *timer)
+uint32_t timer_get_value(hw_timer_t *timer)
 {
 	return platform_timer_get_value(timer);
 }
@@ -76,7 +76,7 @@ uint32_t timer_get_value(timer_t *timer)
  * This allows the timer to automatically recompute its period. There may be some loss of ticks during the clock
  * frequency change.
  */
-void timer_handle_clock_frequency_change(timer_t * timer)
+void timer_handle_clock_frequency_change(hw_timer_t * timer)
 {
 	// Update the timer's internal frequency.
 	platform_timer_set_frequency(timer, timer->frequency);
@@ -89,7 +89,7 @@ void timer_handle_clock_frequency_change(timer_t * timer)
  */
 void set_up_platform_timers(void)
 {
-	timer_t *timer = platform_set_up_platform_timer();
+	hw_timer_t *timer = platform_set_up_platform_timer();
 
 	// Enable the timer, with a frequency of a millisecond.
 	timer_enable(timer, 1000000UL);
@@ -105,7 +105,7 @@ void set_up_platform_timers(void)
 uint32_t get_time(void)
 {
 	// Return the value on the platform timer.
-	timer_t *timer = platform_get_platform_timer();
+	hw_timer_t *timer = platform_get_platform_timer();
 	return timer_get_value(timer);
 }
 
@@ -126,7 +126,7 @@ uint32_t get_time_since(uint32_t base)
  */
 void handle_platform_timer_frequency_change(void)
 {
-	timer_t *platform_timer = platform_get_platform_timer();
+	hw_timer_t *platform_timer = platform_get_platform_timer();
 
 	if (!platform_timer) {
 		return;
@@ -159,7 +159,7 @@ void delay_us(uint32_t duration)
  * @param function The function to be called. Should return void and accept a void*.
  * @param argument The argument to be provided to the given function.
  */
-uint32_t call_function_periodically(timer_t *timer, uint32_t frequency, timer_callback_t function, void *argument)
+uint32_t call_function_periodically(hw_timer_t *timer, uint32_t frequency, timer_callback_t function, void *argument)
 {
 	timer->callback_frequency = frequency;
 
@@ -173,7 +173,7 @@ uint32_t call_function_periodically(timer_t *timer, uint32_t frequency, timer_ca
 /**
  * Cancels all periodic function calls associated with a given timer.
  */
-uint32_t cancel_periodic_function_calls(timer_t *timer)
+uint32_t cancel_periodic_function_calls(hw_timer_t *timer)
 {
 	platform_cancel_periodic_callbacks(timer);
 	return 0;
@@ -184,7 +184,7 @@ uint32_t cancel_periodic_function_calls(timer_t *timer)
 /**
  * Releases a timer reserved with acquire_timer.
  */
-void release_timer(timer_t *timer)
+void release_timer(hw_timer_t *timer)
 {
 	platform_timer_disable(timer);
 	platform_release_timer(timer->number);

@@ -28,13 +28,13 @@ struct {
 /**
  * Timer object for the timer reserved for system use.
  */
-static timer_t platform_timer = { .reg = NULL, .number = TIMER3 };
+static hw_timer_t platform_timer = { .reg = NULL, .number = TIMER3 };
 
 // When a given timer interrupt occurs, we'll want to be able to look
 // up the timer object associated with it. This array will track the timers
 // associated with the TIMER0-TIMER4 IRQs. Entries are only valid when a given
 // timer's interrupt is enabled.
-static timer_t *timer_for_irq[SUPPORTED_TIMERS];
+static hw_timer_t *timer_for_irq[SUPPORTED_TIMERS];
 
 // Track which timers are in use.
 bool timer_in_use[SUPPORTED_TIMERS];
@@ -141,7 +141,7 @@ static platform_branch_clock_t *platform_get_timer_clock(timer_index_t index)
  * @param timer The timer object to be initialized.
  * @param index The number of the timer to be set up.
  */
-void platform_timer_initialize(timer_t *timer, timer_index_t index)
+void platform_timer_initialize(hw_timer_t *timer, timer_index_t index)
 {
 	// Store the hardware assets relevant to the timer.
 	timer->reg = platform_get_timer_registers(index);
@@ -159,7 +159,7 @@ void platform_timer_initialize(timer_t *timer, timer_index_t index)
 /**
  * Identifies the clock divider necessary to most closely approximate a given frequency.
  */
-static uint32_t compute_divider_for_frequency(timer_t *timer, uint32_t frequency)
+static uint32_t compute_divider_for_frequency(hw_timer_t *timer, uint32_t frequency)
 {
 	platform_branch_clock_t *clock = platform_get_timer_clock(timer->number);
 
@@ -180,7 +180,7 @@ static uint32_t compute_divider_for_frequency(timer_t *timer, uint32_t frequency
  * @param timer The timer to be configured.
  * @param tick_frequency The timer's tick frequency, in Hz.
  */
-void platform_timer_set_frequency(timer_t *timer, uint32_t tick_frequency)
+void platform_timer_set_frequency(hw_timer_t *timer, uint32_t tick_frequency)
 {
 	uint32_t target_divider = compute_divider_for_frequency(timer, tick_frequency);
 
@@ -193,7 +193,7 @@ void platform_timer_set_frequency(timer_t *timer, uint32_t tick_frequency)
  * Sets the frequency of the timer's match interrupt, but does not set the interrupt's
  * handler, or enable it in the NVIC. The interrupt should be disabled in the NVIC before callling this.
  */
-void platform_timer_set_interrupt_frequency(timer_t *timer, uint32_t event_frequency)
+void platform_timer_set_interrupt_frequency(hw_timer_t *timer, uint32_t event_frequency)
 {
 	match_control_register_t match_control = {};
 
@@ -220,7 +220,7 @@ void platform_timer_set_interrupt_frequency(timer_t *timer, uint32_t event_frequ
  * Enables the given timer. Typically, you want to configure the timer
  * beforehand with calls to e.g. platform_timer_set_frequency.
  */
-void platform_timer_enable(timer_t *timer)
+void platform_timer_enable(hw_timer_t *timer)
 {
 	timer->reg->enabled = 1;
 }
@@ -229,7 +229,7 @@ void platform_timer_enable(timer_t *timer)
 /**
  * Disables the given timer, and all associated events.
  */
-void platform_timer_disable(timer_t *timer)
+void platform_timer_disable(hw_timer_t *timer)
 {
 	timer->reg->enabled = 0;
 
@@ -242,7 +242,7 @@ void platform_timer_disable(timer_t *timer)
 /**
  * @returns True iff the given timer is enabled.
  */
-bool platform_timer_enabled(timer_t *timer)
+bool platform_timer_enabled(hw_timer_t *timer)
 {
 	return timer->reg->enabled;
 }
@@ -252,7 +252,7 @@ bool platform_timer_enabled(timer_t *timer)
 /**
  * @returns the current counter value of the given timer
  */
-uint32_t platform_timer_get_value(timer_t *timer)
+uint32_t platform_timer_get_value(hw_timer_t *timer)
 {
 	return timer->reg->value;
 }
@@ -264,7 +264,7 @@ uint32_t platform_timer_get_value(timer_t *timer)
  *
  * @returns A reference to the system's platform timer.
  */
-timer_t *platform_set_up_platform_timer(void)
+hw_timer_t *platform_set_up_platform_timer(void)
 {
 	timer_in_use[platform_timer.number] = true;
 
@@ -276,7 +276,7 @@ timer_t *platform_set_up_platform_timer(void)
 /**
  * @returns A reference to the system's platform timer, or NULL if it has not yet been set up.
  */
-timer_t *platform_get_platform_timer(void)
+hw_timer_t *platform_get_platform_timer(void)
 {
 	// If the platform timer hasn't been set up yet, enable it.
 	if (!platform_timer.reg || !platform_timer_enabled(&platform_timer)) {
@@ -290,7 +290,7 @@ timer_t *platform_get_platform_timer(void)
 /**
  * Core timer interrupt handler.
  */
-static void timer_interrupt_handler(timer_t *timer)
+static void timer_interrupt_handler(hw_timer_t *timer)
 {
 	// Mark the relevant interrupt as serviced...
 	timer->reg->interrupt_pending.match0 = 1;
@@ -316,7 +316,7 @@ static void timer3_isr(void) { timer_interrupt_handler(timer_for_irq[3]); }
  * Sets up a timer to handle any periodic callbacks associated with it.
  * Requires the platform-independent driver to have populated its interval callback fields.
  */
-uint32_t platform_schedule_periodic_callbacks(timer_t *timer)
+uint32_t platform_schedule_periodic_callbacks(hw_timer_t *timer)
 {
 	interrupt_service_routine_t isrs[] = {timer0_isr, timer1_isr, timer2_isr, timer3_isr};
 
@@ -336,4 +336,13 @@ uint32_t platform_schedule_periodic_callbacks(timer_t *timer)
 	// ... and the timer itself.
 	timer->reg->enabled = 1;
 	return 0;
+}
+
+
+/**
+ * Cancels all periodic callbacks associated with a given timer.
+ */
+uint32_t platform_cancel_periodic_callbacks(hw_timer_t *timer)
+{
+	platform_timer_disable(timer);
 }
