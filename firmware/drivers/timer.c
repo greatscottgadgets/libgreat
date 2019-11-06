@@ -12,6 +12,28 @@
 
 
 /**
+ * Attempts to reserve use of a timer from the pool of timers that are not in use.
+ * Timer is automatically initialized on acquisition, but not configured to a given
+ * frequency or enabled.
+ *
+ * @param timer A timer object that will be populated automatically once acquired.
+ * @return 0 on success, or an error code if no timer could be acquired
+ */
+uint32_t acquire_timer(timer_t *timer)
+{
+	timer_index_t index = platform_reserve_free_timer();
+
+	if (index == NO_TIMER_AVAILABLE) {
+		return EBUSY;
+	}
+
+	// Perform platform-specific timer initialization.
+	platform_timer_initialize(timer, index);
+	return 0;
+}
+
+
+/**
  * Initializes a timer peripheral.
  *
  * @param timer The timer object to be initialized.
@@ -130,4 +152,41 @@ void delay_us(uint32_t duration)
 }
 
 
+/**
+ * Schedules a given function to execute periodically. Assumes the caller is not using the timer for anything else.
+ *
+ * @param frequency The frequency with which the function should be called.
+ * @param function The function to be called. Should return void and accept a void*.
+ * @param argument The argument to be provided to the given function.
+ */
+uint32_t call_function_periodically(timer_t *timer, uint32_t frequency, timer_callback_t function, void *argument)
+{
+	timer->callback_frequency = frequency;
+
+	timer->interval_callback = function;
+	timer->interval_callback_argument = argument;
+
+	return platform_schedule_periodic_callbacks(timer);
+}
+
+
+/**
+ * Cancels all periodic function calls associated with a given timer.
+ */
+uint32_t cancel_periodic_function_calls(timer_t *timer)
+{
+	platform_cancel_periodic_callbacks(timer);
+	return 0;
+}
+
+
+
+/**
+ * Releases a timer reserved with acquire_timer.
+ */
+void release_timer(timer_t *timer)
+{
+	platform_timer_disable(timer);
+	platform_release_timer(timer->number);
+}
 

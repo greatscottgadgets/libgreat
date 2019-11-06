@@ -9,18 +9,66 @@
 
 #include <toolchain.h>
 
+#include <drivers/platform_clock.h>
+
 typedef struct timer timer_t;
 
-
 /**
- * Timer numbers for each of the LPC43xx timer perpiherals.
+ * Timer numbers for each of the LPC43xx timer peripherals.
  */
 typedef enum {
 	TIMER0 = 0,
 	TIMER1 = 1,
 	TIMER2 = 2,
 	TIMER3 = 3,
+
+	// Meta: the total number of timers.
+	SUPPORTED_TIMERS = 4,
+
+	// Flag: used to indicate that no timer is available.
+	NO_TIMER_AVAILABLE = -1
 } timer_index_t;
+
+
+/**
+ * Platform specific data for the LPC43xx timer.
+ */
+typedef struct {
+
+	// The branch clock for the relevant timer.
+	platform_branch_clock_t *clock;
+
+	// Stores the interrupt corresponding to the relevant timer.
+	// FIXME: this should be a platform_irq_t, but we can't switch to this until the USB driver uses libgreat vector drivers
+	uint32_t irq;
+
+} platform_timer_data_t;
+
+
+/**
+ * Model of the register that controls timer match event behaviors.
+ */
+typedef union {
+	struct {
+		uint32_t interrupt_on_match0 : 1;
+		uint32_t reset_on_match0     : 1;
+		uint32_t stop_on_match0      : 1;
+
+		uint32_t interrupt_on_match1 : 1;
+		uint32_t reset_on_match1     : 1;
+		uint32_t stop_on_match1      : 1;
+
+		uint32_t interrupt_on_match2 : 1;
+		uint32_t reset_on_match2     : 1;
+		uint32_t stop_on_match2      : 1;
+
+		uint32_t interrupt_on_match3 : 1;
+		uint32_t reset_on_match3     : 1;
+		uint32_t stop_on_match3      : 1;
+	};
+	uint32_t all;
+} match_control_register_t;
+
 
 
 /**
@@ -60,7 +108,7 @@ typedef volatile struct ATTR_PACKED {
 	uint32_t prescale_counter;
 
 	// Control registers for matching hardware.
-	uint32_t match_control;
+	match_control_register_t match_control;
 	uint32_t match_value[4];
 
 	// Control registers for the capture hardware.
@@ -92,7 +140,6 @@ typedef volatile struct ATTR_PACKED {
 
 
 ASSERT_OFFSET(platform_timer_registers_t, value,                   0x08);
-ASSERT_OFFSET(platform_timer_registers_t, match_control,           0x14);
 ASSERT_OFFSET(platform_timer_registers_t, capture_control,         0x28);
 ASSERT_OFFSET(platform_timer_registers_t, external_match_register, 0x3c);
 ASSERT_OFFSET(platform_timer_registers_t, count_control_register,  0x70);
@@ -111,49 +158,5 @@ typedef enum {
 	TIMER_COUNT_EVENT_EDGES         = 3,
 } timer_counter_mode_t;
 
-
-/**
- * Perform platform-specific initialization for an LPC43xx timer peripheral.
- *
- * @param timer The timer object to be initialized.
- * @param index The number of the timer to be set up.
- */
-void platform_timer_initialize(timer_t *timer, timer_index_t index);
-
-
-/**
- * Sets the frequency of the given timer. For the LPC43xx, this recomputes the timer's divider.
- *
- * @param timer The timer to be configured.
- * @param tick_freuqency The timer's tick frequency, in Hz.
- */
-void platform_timer_set_frequency(timer_t *timer, uint32_t tick_frequency);
-
-
-/**
- * Enables the given timer. Typically, you want to configure the timer
- * beforehand with calls to e.g. platform_timer_set_frequency.
- */
-void platform_timer_enable(timer_t *timer);
-
-
-/**
- * @returns the current counter value of the given timer
- */
-uint32_t platform_timer_get_value(timer_t *timer);
-
-
-/**
- * @returns A reference to the system's platform timer -- initializing the relevant timer, if needed.
- */
-timer_t *platform_get_platform_timer(void);
-
-
-/**
- * Sets up the system's platform timer.
- *
- * @returns A reference to the system's platform timer.
- */
-timer_t *platform_set_up_platform_timer(void);
 
 #endif
