@@ -25,12 +25,20 @@
 #define ATTR_PRINTF       __attribute__((format (printf, 1, 2)))
 #define ATTR_PRINTF_N(n)  __attribute__((format (printf, n, n + 1)))
 #define ATTR_USED         __attribute__((used))
+#define ATTR_OPTIMIZE_HZ  __attribute__((hot))
 
 
 /**
  * Attribute helpers for variables that should persist across a reset.
  */
 #define ATTR_PERSISTENT ATTR_SECTION(".bss.persistent")
+
+
+/**
+ * Optimization helpers for critical sections.
+ */
+#define likely(x)      __builtin_expect(!!(x), 1)
+#define unlikely(x)    __builtin_expect(!!(x), 0)
 
 
 /**
