@@ -631,9 +631,9 @@ inline sgpio_clock_source_t sgpio_clock_source_from_pin_configuration(sgpio_pin_
 {
 	switch (pin.sgpio_pin) {
 		case  8: return SGPIO_CLOCK_SOURCE_SGPIO08;
-		case  9: return SGPIO_CLOCK_SOURCE_SGPIO08;
-		case 10: return SGPIO_CLOCK_SOURCE_SGPIO08;
-		case 11: return SGPIO_CLOCK_SOURCE_SGPIO08;
+		case  9: return SGPIO_CLOCK_SOURCE_SGPIO09;
+		case 10: return SGPIO_CLOCK_SOURCE_SGPIO10;
+		case 11: return SGPIO_CLOCK_SOURCE_SGPIO11;
 		default:
 			pr_error("sgpio: error: specified a pin that could not be used as a clock source!\n");
 			return -1;
