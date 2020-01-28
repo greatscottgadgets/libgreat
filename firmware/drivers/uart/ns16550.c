@@ -45,7 +45,7 @@ static uint32_t get_actual_baud_rate(uint32_t clk_freq, uint8_t multiplier,
 	// If our fractional component is zero, the fractional divisor isn't being used.
 	// Compute an integer divisor directly.
 	if (fractional_divisor == 0) {
-		return clk_freq / integer_divisor;
+		return clk_freq / (integer_divisor * 16);
 	} else {
 		float fractional_ratio = 1 + ((float)fractional_divisor / (float)multiplier);
 		float actual_divisor = 16 * integer_divisor * fractional_ratio;
