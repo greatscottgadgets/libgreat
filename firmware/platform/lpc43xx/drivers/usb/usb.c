@@ -494,6 +494,19 @@ void usb_endpoint_stall(
 	}
 }
 
+void usb_endpoint_clear_stall(const usb_endpoint_t* const endpoint)
+{
+	const uint8_t endpoint_number = usb_endpoint_number(endpoint->address);
+
+	if (endpoint->device->controller == 0) {
+		USB0_ENDPTCTRL(endpoint_number) &= ~(USB0_ENDPTCTRL_RXS | USB0_ENDPTCTRL_TXS);
+	}
+
+	if (endpoint->device->controller == 1) {
+		USB1_ENDPTCTRL(endpoint_number) &= ~(USB0_ENDPTCTRL_RXS | USB0_ENDPTCTRL_TXS);
+	}
+}
+
 void usb_controller_run(const usb_peripheral_t* const device) {
 	USB_REG(device->controller)->USBCMD |= USB0_USBCMD_D_RS;
 }
