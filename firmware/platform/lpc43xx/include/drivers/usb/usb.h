@@ -135,6 +135,10 @@ void usb_endpoint_stall(
 	const usb_endpoint_t* const endpoint
 );
 
+void usb_endpoint_clear_stall(
+	const usb_endpoint_t* const endpoint
+);
+
 void usb_endpoint_disable(
 	const usb_endpoint_t* const endpoint
 );
