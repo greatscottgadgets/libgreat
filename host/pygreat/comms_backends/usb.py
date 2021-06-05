@@ -142,9 +142,12 @@ class USBCommsBackend(CommsBackend):
                 return
             except usb.core.USBError as e:
 
-                # If we have EBUSY (linux) or EACCES (macos), or None (windows), try again.
-                if e.errno in (errno.EBUSY, errno.EACCES, None):
+                # If we have EBUSY (linux) or EACCES (macos), try again.
+                if e.errno in (errno.EBUSY, errno.EACCES):
                     pass
+                # If we have None (windows), just return.
+                elif e.errno in (None, ):
+                    return
                 else:
                     raise
 
