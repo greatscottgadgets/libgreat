@@ -46,6 +46,7 @@ typedef struct {
  * Mapping that provides the location of the default pins for each UART.
  */
 uart_pins_t uart_pins[] = {
+	// USART0
 	{
 		.tx = { .group = 9, .pin = 5, .function = 7 },
 		.rx = { .group = 9, .pin = 6, .function = 7 }
@@ -54,6 +55,27 @@ uart_pins_t uart_pins[] = {
 	},
 
 	// FIXME: add the other UARTS!
+	// UART1
+	{
+		.tx = { .group = 1, .pin = 13, .function = 1 },
+		.rx = { .group = 1, .pin = 14, .function = 1 }
+
+		// TODO: add flow control pins!
+	},
+	// USART2
+	{
+		.tx = { .group = 1, .pin = 15, .function = 1 },
+		.rx = { .group = 1, .pin = 16, .function = 1 }
+
+		// TODO: add flow control pins!
+	},
+	// USART3
+	{
+		.tx = { .group = 2, .pin = 3, .function = 2 },
+		.rx = { .group = 2, .pin = 4, .function = 2 }
+
+		// TODO: add flow control pins!
+	},
 };
 
 
