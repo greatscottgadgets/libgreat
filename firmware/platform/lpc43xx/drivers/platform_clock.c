@@ -1446,137 +1446,99 @@ static int platform_configure_main_pll_parameters(uint32_t target_frequency, uin
 
 	return 0;
 }
-
 /**
- * Method meant to aide in soft-staring the CPU clock. Brings the CPU to a given frequency if that
- * frequency is on the path to the provided target frequency.
- */
-static void platform_nudge_cpu_frequency_through(uint32_t frequency, uint32_t target_frequency)
-{
-	if (target_frequency > frequency) {
-		platform_bring_up_main_pll(frequency);
-	}
-}
-
-
-/**
- * Workaround for a silicon bug in which the CPU is allowed to execute before the PLL settles fully,
- * even when the option to block until PLL lock is used. We slowly step the frequency up through some
- * fixed points, ensuring the gradual rise keeps ringing to a minimum.
- */
-static void platform_step_up_cpu_frequency_to(uint32_t target_frequency)
-{
-	platform_nudge_cpu_frequency_through(144 * MHZ, target_frequency);
-	platform_nudge_cpu_frequency_through(168 * MHZ, target_frequency);
-	platform_nudge_cpu_frequency_through(192 * MHZ, target_frequency);
-	platform_bring_up_main_pll(target_frequency);
-}
-
-
-/**
+ * This function implements the sequence recommended in:
+ * UM10503 Rev 2.4 (Aug 2018), section 13.2.1.1, page 167.
  */
 static void platform_soft_start_cpu_clock(void)
 {
 	int rc;
 
-	// Per the user manual, we need to soft start if the relevant frequency is  >=
-	// 110 MHz [13.2.1.1]. This means holding the relevant base clock at
-	// half-frequency for 50uS.
-	const uint32_t soft_start_cutoff      = 110 * MHZ;
-	const uint32_t soft_start_nudge_point = 120 * MHZ;
-	const uint32_t soft_start_duration = 50;
-
 	platform_clock_generation_register_block_t *cgu = get_platform_clock_generation_registers();
 
-	// Identify the clock source for the CPU, which will determine if we have to
-	// soft-start.
+	// Identify the clock source for the CPU.
 	const platform_base_clock_configuration_t *config = platform_find_config_for_base_clock(&cgu->m4);
 	clock_source_t parent_clock                       = platform_get_physical_clock_source(config->source);
 
-	// And read the source clock's target frequency.
-	uint32_t source_frequency = platform_clock_source_configurations[parent_clock].frequency;
-	uint32_t target_frequency = source_frequency;
+	// Read the target frequency.
+	uint32_t target_frequency = platform_clock_source_configurations[parent_clock].frequency;
 
+	// The CPU must run at the mid range of 90-110MHz for 50us before being stepped up to the
+	// high range of >110MHz. The step-up is implemented by doubling the mid range frequency
+	// using the PLL's output divider. Therefore we can only support two frequency windows
+	// using this function: those up to the mid range i.e. <= 110 MHz), and those we can double
+	// to from the mid range, but constrained by the part's 204 MHz limit (180-204 MHz).
+	uint32_t upper_max = 204 * MHZ;
+	uint32_t upper_min = 180 * MHZ;
+	uint32_t lower_max = 110 * MHZ;
 
-	// If this clock is going to run at a frequency low enough that we don't have
-	// to soft-start it, we'll abort here and let the normal configuration bring
-	// the clock up.
-	if (source_frequency < soft_start_cutoff) {
-		return;
-	}
-
-
-	// If this clock would be running at a frequency greater than 192MHz, there's an
-	// interesting ... er, behavior ... that we have to watch out for.
-	if (source_frequency > soft_start_nudge_point) {
-		source_frequency = soft_start_nudge_point;
-	}
-
-
-	// For now, we only support soft-starting off of PLL1.
-	// TODO: support soft-starting via other clocks, perhaps using an integer
-	// divider?
+	// If the parent clock is not PLL1, this function is not used.
 	if (parent_clock != CLOCK_SOURCE_PLL1) {
-		pr_warning("warning: not able to soft-switch the CPU to source %s (%d); "
-				 "system may be unstable.\n",
-				 platform_get_clock_source_name(parent_clock), parent_clock);
+		// This means soft start isn't implemented for this source, so warn if going above the mid-range.
+		if (target_frequency >= lower_max) {
+			pr_warning("warning: CPU is configured to run at >= 110 MHz from clock source %s (%d), "
+				" but soft-start is not implemented for this source; system may be unstable\n",
+				platform_get_clock_source_name(parent_clock), parent_clock);
+		}
 		return;
 	}
 
-	pr_debug("clock: soft-switching the main CPU clock to %" PRIu32 " Hz\n", source_frequency);
+	// Check which range we are in, and fail if not in one of our two supported windows.
+	bool high_range;
+	if (target_frequency >= upper_min && target_frequency <= upper_max) {
+		high_range = true;
+	} else if (target_frequency <= lower_max) {
+		high_range = false;
+	} else {
+		pr_critical("critical: not able to set CPU clock to core PLL at %" PRIu32 " Hz, "
+			"supported ranges are <= 110 MHz and 180-204 MHz; "
+			"falling back to internal oscillator", target_frequency);
+		return;
+	}
 
-	// First, ensure the main CPU complex is running our safe, slow internal
-	// oscillator.
-	cgu->m4.source = CLOCK_SOURCE_INTERNAL_OSCILLATOR;
-
-	// Configure the main PLL to produce the target frequency -- this is
-	// essentially the mode we _want_ to run in. This configures the core PLL to
-	// come up in the state we want.
-	rc = platform_bring_up_main_pll(source_frequency);
+	// Now we follow the sequence from UM10503 Rev 2.4 (Aug 2018), section 13.2.1.1, page 167.
+	//
+	// 1. Select the IRC as BASE_M4_CLK source.
+	//    (This was already done in platform_initialize_early_clocks).
+	//
+	// 2. Enable the crystal oscillator.
+	// 3. Wait 250us.
+	// 4. Set the AUTOBLOCK bit.
+	// 5. Reconfigure PLL1 to produce the final output frequency.
+	// 6. Wait for PLL1 to lock.
+	//    (These steps are all implemented in platform_bring_up_main_pll)
+	rc = platform_bring_up_main_pll(target_frequency);
 	if (rc) {
+		pr_critical("critical: failed to bring up core PLL at %" PRIu32 " Hz for CPU clock; ",
+			"falling back to internal oscillator", target_frequency);
 		return;
 	}
 
-	// Configure the system bus to block during all future frequency changes, to
-	// make sure we never accidentally clock-glitch the CPU.
-	cgu->pll1.block_during_frequency_changes = 1;
-
-	// If we're currently bypassing the output divider, turning the divider
-	// on (and to its least setting) achieves a trivial divide-by-two.
-	if (cgu->pll1.bypass_output_divider) {
+	// Skip the next step if we're not going above the mid range.
+	if (high_range) {
+		// 7. Set the PLL1 P-divider to divide by 2 (DIRECT=0, PSEL=0).
 		cgu->pll1.output_divisor_P      = 0;
 		cgu->pll1.bypass_output_divider = 0;
-	} else {
-		cgu->pll1.output_divisor_P++;
 	}
-	while (!cgu->pll1.locked)
-		;
 
-	// Set the main CPU clock to our halved PLL...
+	// 8. Select PLL1 as BASE_M4_CLK source.
 	cgu->m4.source = parent_clock;
 	platform_handle_base_clock_frequency_change(&cgu->m4);
 
-	// ... and hold it there for our soft-start period.
-	pr_debug("clock: CPU is now running from %s\n", platform_get_clock_source_name(parent_clock));
-	delay_us(soft_start_duration);
+	// Skip the final steps if we're not going above the mid range.
+	if (high_range) {
+		pr_debug("clock: CPU is now running at %" PRIu32 " Hz\n", target_frequency / 2);
 
-	// Undo our changes, bringing the PLL output back up to its full speed.
-	if (cgu->pll1.output_divisor_P == 0) {
+		// 9. Wait 50us.
+		delay_us(50);
+
+		// 10. Set the PLL1 P-divider to direct output mode (DIRECT=1).
 		cgu->pll1.bypass_output_divider = 1;
-	} else {
-		cgu->pll1.output_divisor_P--;
-	}
-	while (!cgu->pll1.locked)
-		;
 
-	platform_handle_base_clock_frequency_change(&cgu->m4);
-	pr_debug("clock: CPU is now running at our soft-start speed of %" PRIu32 "\n", source_frequency);
-
-	// If we're not yet to our target frequency, gradually step the CPU frequency up to that point.
-	if (target_frequency != source_frequency) {
-		platform_step_up_cpu_frequency_to(target_frequency);
+		platform_handle_base_clock_frequency_change(&cgu->m4);
 	}
 
+	pr_debug("clock: CPU is now running at %" PRIu32 " Hz\n", target_frequency);
 }
 
 /**
