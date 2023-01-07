@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=41", "wheel", "setuptools-git-versioning<2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pygreat"
+dynamic = ["version"]
+authors = [
+    {name = "Katherine J. Temkin", email = "ktemkin@greatscottgadgets.com"},
+]
+license = { text = "BSD" }
+description = "Python library for talking with libGreat devices"
+urls = { Source = "https://greatscottgadgets.com/greatfet" }
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python",
+    "Development Status :: 1 - Planning",
+    "Natural Language :: English",
+    "Environment :: Console",
+    "Environment :: Plugins",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Security",
+]
+dependencies = [
+    "pyusb",
+    "future",
+    "backports.functools_lru_cache",
+]
+
+[tool.setuptools-git-versioning]
+enabled = true
+starting_version = "2019.05.01"
