@@ -77,17 +77,27 @@ class CommsBackend(object):
 
     @classmethod
     def from_device_uri(cls, **device_uri):
-        """ Creates a CommsBackend object apporpriate for the given device_uri.  """
+        """ Creates a CommsBackend object appropriate for the given device_uri.  """
 
-        #FIXME: implment this properly
-
-        from .comms_backends.usb import USBCommsBackend
+        #FIXME: implement this properly
 
         # TODO: handle providing board "URIs", like "usb://1234abcd/?param=value",
         # and automatic resolution to a backend?
         # TODO: support more than USB
 
+        # Use the usb1 backend if this is a Cynthion.
+        # TODO use cynthion vendor/product id and interface protocol field
+        # TODO we should probably rather run through the backends and return
+        #      the backend that can successfully match the device_identifiers
+        if 'idVendor' in device_uri and 'idProduct' in device_uri:
+            idVendor = device_uri['idVendor']
+            idProduct = device_uri['idProduct']
+            if idVendor == 0x1d50 and idProduct == 0x615b:
+                from .comms_backends.usb1 import USB1CommsBackend
+                return USB1CommsBackend(**device_uri)
+
         # XXX: for now, just create a USB backend, as that's all we support
+        from .comms_backends.usb import USBCommsBackend
         return USBCommsBackend(**device_uri)
 
 
@@ -579,6 +589,14 @@ class CommsBackend(object):
     @classmethod
     @memoize_with_lru_cache(maxsize=128)
     def unpack(cls, format_string, raw_bytes):
+        try:
+            return cls._unpack(cls, format_string, raw_bytes)
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to unpack struct from raw bytes: {len(raw_bytes)} bytes => {raw_bytes}")
+            raise e
+
+    def _unpack(cls, format_string, raw_bytes):
         """ Extended version of struct.unpack() for libgreat communciations.
 
         Accepts mostly the same arguments as struct.pack, with the following
