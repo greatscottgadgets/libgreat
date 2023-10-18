@@ -36,6 +36,23 @@ typedef enum {
 
 
 /**
+ * Enumeration specifying the drive strength to be configured for a given pin.
+ */
+typedef enum {
+	SCU_NORMAL   = 0b00,
+	SCU_MEDIUM   = 0b01,
+	SCU_HIGH     = 0b10,
+	SCU_ULTRA    = 0b11,
+
+	// Platform agnostic names.
+	DRIVE_CONFIG_NORMAL   = 0b00,
+	DRIVE_CONFIG_MEDIUM   = 0b01,
+	DRIVE_CONFIG_HIGH     = 0b10,
+	DRIVE_CONFIG_ULTRA    = 0b11,
+ } scu_drive_configuration_t;
+
+
+/**
  * Type that represents an SCU register for a given pin.
  */
 typedef struct ATTR_PACKED {
@@ -44,7 +61,8 @@ typedef struct ATTR_PACKED {
 	uint32_t use_fast_slew         : 1;
 	uint32_t input_buffer_enabled  : 1;
 	uint32_t disable_glitch_filter : 1;
-	uint32_t                       : 24;
+	uint32_t drive_strength        : 2;  
+	uint32_t                       : 22;
 } platform_scu_pin_configuration_t;
 typedef volatile platform_scu_pin_configuration_t platform_scu_pin_register_t;
 
