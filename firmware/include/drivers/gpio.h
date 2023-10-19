@@ -28,6 +28,13 @@ int gpio_configure_pinmux_and_resistors(gpio_pin_t pin, gpio_resistor_configurat
 
 
 /**
+ * Configures the system's pinmux to route the given GPIO pin to a physical pin
+ * and apply the given pin configuration.
+ */
+int gpio_configure_pinmux_and_pin(gpio_pin_t pin, gpio_pin_configuration_t pin_configuration);
+
+
+/**
  * Configures the system's pinmux to route all possible GPIO
  * pins for a given port.
  */

@@ -16,6 +16,8 @@
 // For LPCxx devices, use the SCU resistor configuration as the GPIO resistor configuration.
 typedef scu_resistor_configuration_t gpio_resistor_configuration_t;
 
+// For LPCxx devices, use the SCU pin register block as the GPIO pin configuration.
+typedef platform_scu_pin_register_t gpio_pin_configuration_t;
 
 // Describe the chip's GPIO capabilities.
 #define GPIO_MAX_PORTS 6

@@ -460,6 +460,39 @@ int gpio_configure_pinmux_and_resistors(gpio_pin_t pin, gpio_resistor_configurat
 }
 
 
+/**
+ * Configures the system's pinmux to route the given GPIO pin to a physical pin
+ * and apply the given pin configuration.
+ *
+ * Note that any provided function in the pin configuration will be overridden by
+ * the GPIO function.
+ */
+int gpio_configure_pinmux_and_pin(gpio_pin_t pin, gpio_pin_configuration_t pin_configuration)
+{
+	uint8_t scu_group, scu_pin;
+
+	if (validate_port_and_pin(pin)) {
+		return EINVAL;
+	}
+
+	// Get the SCU group/pin so we can pinmux.
+	scu_group = gpio_get_group_number(pin);
+	scu_pin   = gpio_get_pin_number(pin);
+
+	// If this port/pin doesn't correspond to a valid physical pin,
+	// fail out.
+	if ((scu_group == 0xff) || (scu_pin == 0xff)) {
+		return EINVAL;
+	}
+
+	// Select the pinmux function to apply.
+	pin_configuration.function = (pin.port == 5) ? 4 : 0;
+
+	// Finally, configure the SCU.
+	platform_scu_configure_pin(scu_group, scu_pin, pin_configuration);	
+	return 0;
+}
+
 
 /**
  * Configures the system's pinmux to route the given GPIO
@@ -467,7 +500,7 @@ int gpio_configure_pinmux_and_resistors(gpio_pin_t pin, gpio_resistor_configurat
  */
 int gpio_configure_pinmux(gpio_pin_t pin)
 {
-	gpio_configure_pinmux_and_resistors(pin, SCU_NO_PULL);
+	return gpio_configure_pinmux_and_resistors(pin, SCU_NO_PULL);
 }
 
 
