@@ -145,6 +145,9 @@ class USBCommsBackend(CommsBackend):
                 # If we have EBUSY (linux) or EACCES (macos), or None (windows), try again.
                 if e.errno in (errno.EBUSY, errno.EACCES, None):
                     pass
+                # If we have None (windows), just return
+                elif e.errno in (None, ):
+                    return
                 else:
                     raise
 
