@@ -7,9 +7,15 @@ Module containing the core definitions for a libgreat-driven board.
 """
 
 # FIXME: remove dependencies
-import usb
-import future
+import os
+import platform
 import time
+
+import future
+import usb
+
+if platform.system() == "Darwin":
+    os.environ["DYLD_FALLBACK_LIBRARY_PATH"] = f"{os.environ['HOMEBREW_PREFIX']}/lib/"
 
 # Use the GreatFET comms API, and the standard (core) API.
 from pygreat.comms import CommsBackend
