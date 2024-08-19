@@ -41,4 +41,4 @@ Issues        = "https://github.com/greatscottgadgets/libgreat/issues"
 
 [tool.setuptools-git-versioning]
 enabled = true
-starting_version = "2024.0.0"
+starting_version = "2024.0.2"
