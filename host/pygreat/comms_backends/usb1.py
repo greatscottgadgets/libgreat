@@ -400,7 +400,7 @@ class USB1CommsBackend(CommsBackend):
                     # Set the FLAG_SKIP_RESPONSE flag if we don't expect a response back from the device.
                     flags = self.LIBGREAT_FLAG_SKIP_RESPONSE if skip_reading_response else 0
 
-                    self.device_handle.controlWrite(usb1.TYPE_VENDOR | usb1.RECIPIENT_ENDPOINT,
+                    self.device_handle.controlWrite(usb1.TYPE_VENDOR | usb1.RECIPIENT_DEVICE,
                         self.LIBGREAT_REQUEST_NUMBER, self.LIBGREAT_VALUE_EXECUTE, flags, to_send, timeout)
 
                     # If we're skipping reading a response, return immediately.
@@ -416,7 +416,7 @@ class USB1CommsBackend(CommsBackend):
                     max_response_length = self.LIBGREAT_MAX_COMMAND_SIZE
 
                 # ... and read any response the device has prepared for us.
-                response = self.device_handle.controlRead(usb1.TYPE_VENDOR | usb1.RECIPIENT_ENDPOINT,
+                response = self.device_handle.controlRead(usb1.TYPE_VENDOR | usb1.RECIPIENT_DEVICE,
                     self.LIBGREAT_REQUEST_NUMBER, self.LIBGREAT_VALUE_EXECUTE, flags, max_response_length, comms_timeout)
                 response = bytes(response)
 
@@ -459,7 +459,7 @@ class USB1CommsBackend(CommsBackend):
 
         # Create a quick function to issue the abort request.
         execute_abort = lambda device : device.controlRead(
-            usb1.TYPE_VENDOR | usb1.RECIPIENT_ENDPOINT,
+            usb1.TYPE_VENDOR | usb1.RECIPIENT_DEVICE,
             self.LIBGREAT_REQUEST_NUMBER,
             self.LIBGREAT_VALUE_CANCEL,
             0,
