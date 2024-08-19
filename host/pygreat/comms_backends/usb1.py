@@ -34,7 +34,7 @@ class USB1CommsBackend(CommsBackend):
     context = None
 
     """ Class variable that stores any devices that still need to be closed at program exit. """
-    devices = []
+    device_handles = []
 
     # TODO this should be defined by the board!
     """ The maximum input/output buffer size for libgreat commands. """
@@ -106,8 +106,8 @@ class USB1CommsBackend(CommsBackend):
     @classmethod
     def _destroy_libusb_context(cls):
         """ Destroys our libusb context on closing our python instance. """
-        for device in cls.devices:
-            device.close()
+        for handle in cls.device_handles:
+            handle.close()
         cls.context.close()
         cls.context = None
 
@@ -197,8 +197,11 @@ class USB1CommsBackend(CommsBackend):
         to a more specific board by serial number.
         """
 
-        # The usb1.UsbDevice device.
+        # The usb1.USBDevice
         self.device = None
+
+        # The usb1.USBDeviceHandle
+        self.device_handle = None
 
         # Zero pad serial numbers to 32 characters to match those
         # provided by the USB descriptors.
@@ -213,8 +216,8 @@ class USB1CommsBackend(CommsBackend):
             raise DeviceNotFoundError()
 
         # Open the device, and get a libusb device handle.
-        self.device = device.open()
-        USB1CommsBackend.devices.append(self.device)
+        self.device_handle = device.open()
+        USB1CommsBackend.device_handles.append(self.device_handle)
 
         # For now, supported boards provide a single configuration, so we
         # can accept the first configuration provided. If the device isn't
@@ -224,8 +227,8 @@ class USB1CommsBackend(CommsBackend):
         # doesn't support this, and macOS considers setting the device's configuration
         # grabbing an exclusive hold on the device. Both set the configuration for us,
         # so this is skipped.
-        if not self.device.getConfiguration():
-            self.device.setConfiguration(self.LIBGREAT_CONFIGURATION)
+        if not self.device_handle.getConfiguration():
+            self.device_handle.setConfiguration(self.LIBGREAT_CONFIGURATION)
 
         # Start off with no knowledge of the device's state.
         self._last_command_arguments = None
@@ -260,7 +263,7 @@ class USB1CommsBackend(CommsBackend):
 
         while True:
             try:
-                self.device.claimInterface(self.LIBGREAT_COMMAND_INTERFACE)
+                self.device_handle.claimInterface(self.LIBGREAT_COMMAND_INTERFACE)
                 return
 
             # If the interface is already in use, repeat until we get the interface, or we time out.
@@ -286,7 +289,7 @@ class USB1CommsBackend(CommsBackend):
             return
 
         # Release our control over interface #0.
-        self.device.releaseInterface(self.LIBGREAT_COMMAND_INTERFACE)
+        self.device_handle.releaseInterface(self.LIBGREAT_COMMAND_INTERFACE)
 
 
     def get_exclusive_access(self):
@@ -400,7 +403,7 @@ class USB1CommsBackend(CommsBackend):
                     # Set the FLAG_SKIP_RESPONSE flag if we don't expect a response back from the device.
                     flags = self.LIBGREAT_FLAG_SKIP_RESPONSE if skip_reading_response else 0
 
-                    self.device.controlWrite(usb1.TYPE_VENDOR | usb1.RECIPIENT_ENDPOINT,
+                    self.device_handle.controlWrite(usb1.TYPE_VENDOR | usb1.RECIPIENT_ENDPOINT,
                         self.LIBGREAT_REQUEST_NUMBER, self.LIBGREAT_VALUE_EXECUTE, flags, to_send, timeout)
 
                     # If we're skipping reading a response, return immediately.
@@ -416,7 +419,7 @@ class USB1CommsBackend(CommsBackend):
                     max_response_length = self.LIBGREAT_MAX_COMMAND_SIZE
 
                 # ... and read any response the device has prepared for us.
-                response = self.device.controlRead(usb1.TYPE_VENDOR | usb1.RECIPIENT_ENDPOINT,
+                response = self.device_handle.controlRead(usb1.TYPE_VENDOR | usb1.RECIPIENT_ENDPOINT,
                     self.LIBGREAT_REQUEST_NUMBER, self.LIBGREAT_VALUE_EXECUTE, flags, max_response_length, comms_timeout)
                 response = bytes(response)
 
@@ -469,11 +472,11 @@ class USB1CommsBackend(CommsBackend):
 
         # And try executing the abort progressively, multiple times.
         try:
-            result = execute_abort(self.device)
+            result = execute_abort(self.device_handle)
         except:
             if retry_delay:
                 time.sleep(retry_delay)
-                result = execute_abort(self.device)
+                result = execute_abort(self.device_handle)
             else:
                 raise
 
@@ -487,7 +490,7 @@ class USB1CommsBackend(CommsBackend):
         USB_ERROR_NO_SUCH_DEVICE = 19
 
         try:
-            self.device.clearHalt()
+            self.device_handle.clearHalt()
             return True
         except usb1.USBErrorNotFound:
             return True
@@ -508,15 +511,15 @@ class USB1CommsBackend(CommsBackend):
         Dispose resources allocated by this connection.  This connection
         will no longer be usable.
         """
-        if self.device is not None:
-            USB1CommsBackend.devices.remove(self.device)
-            self.device.close()
-            self.device = None
+        if self.device_handle is not None:
+            USB1CommsBackend.device_handles.remove(self.device_handle)
+            self.device_handle.close()
+            self.device_handle = None
 
 
     def __del__(self):
         """ Cleans up any hanging USB context before closing. """
-        if USB1CommsBackend.context is not None and self.device is not None:
-            USB1CommsBackend.devices.remove(self.device)
-            self.device.close()
-            self.device = None
+        if USB1CommsBackend.context is not None and self.device_handle is not None:
+            USB1CommsBackend.device_handles.remove(self.device_handle)
+            self.device_handle.close()
+            self.device_handle = None
