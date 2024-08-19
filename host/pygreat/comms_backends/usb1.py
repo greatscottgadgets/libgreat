@@ -209,26 +209,11 @@ class USB1CommsBackend(CommsBackend):
             device_identifiers['serial_number'] = device_identifiers['serial_number'].zfill(32)
 
         # Connect to the device that matches our identifiers.
-        device = self._find_device(device_identifiers)
+        self.device = self._find_device(device_identifiers)
 
         # If we couldn't find a board, bail out early.
-        if device is None:
+        if self.device is None:
             raise DeviceNotFoundError()
-
-        # Open the device, and get a libusb device handle.
-        self.device_handle = device.open()
-        USB1CommsBackend.device_handles.append(self.device_handle)
-
-        # For now, supported boards provide a single configuration, so we
-        # can accept the first configuration provided. If the device isn't
-        # already configured, apply that configuration.
-        #
-        # Note that we can't universally apply configurations, as e.g. linux
-        # doesn't support this, and macOS considers setting the device's configuration
-        # grabbing an exclusive hold on the device. Both set the configuration for us,
-        # so this is skipped.
-        if not self.device_handle.getConfiguration():
-            self.device_handle.setConfiguration(self.LIBGREAT_CONFIGURATION)
 
         # Start off with no knowledge of the device's state.
         self._last_command_arguments = None
@@ -246,7 +231,7 @@ class USB1CommsBackend(CommsBackend):
         take temporary exclusive access (e.g. during a libgreat command).
 
         parameters:
-            timeout -- the maximum amount of time we should wait before
+            timeout -- the maximum wait time in ms
         """
 
         # If we already have exclusive access, there's no need to grab it again.
@@ -261,14 +246,23 @@ class USB1CommsBackend(CommsBackend):
         # interface used by libgreat.
         timeout = time.time() + (timeout / 1000)
 
+        # Try to open, configure, and claim until success or timeout.
         while True:
             try:
-                self.device_handle.claimInterface(self.LIBGREAT_COMMAND_INTERFACE)
-                return
-
-            # If the interface is already in use, repeat until we get the interface, or we time out.
+                # Open the device, and get a libusb device handle.
+                self.device_handle = self.device.open()
+                USB1CommsBackend.device_handles.append(self.device_handle)
             except (usb1.USBErrorAccess, usb1.USBErrorBusy):
                 pass
+
+            if self.device_handle:
+                try:
+                    if self.device_handle.getConfiguration() != self.LIBGREAT_CONFIGURATION:
+                        self.device_handle.setConfiguration(self.LIBGREAT_CONFIGURATION)
+                    self.device_handle.claimInterface(self.LIBGREAT_COMMAND_INTERFACE)
+                    return
+                except (usb1.USBErrorAccess, usb1.USBErrorBusy):
+                    pass
 
             if time.time() > timeout:
                 raise IOError("timed out trying to claim access to a libgreat device!")
@@ -290,6 +284,9 @@ class USB1CommsBackend(CommsBackend):
 
         # Release our control over interface #0.
         self.device_handle.releaseInterface(self.LIBGREAT_COMMAND_INTERFACE)
+        USB1CommsBackend.device_handles.remove(self.device_handle)
+        self.device_handle.close()
+        self.device_handle = None
 
 
     def get_exclusive_access(self):
