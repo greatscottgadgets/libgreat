@@ -94,6 +94,7 @@ typedef volatile struct ATTR_PACKED {
 			uint32_t parity_mode                 : 3;
 			uint32_t use_break                   : 1;
 			uint32_t divior_latch_access_enabled : 1;
+			uint32_t                             : 24;
 		};
 		uint32_t line_control_register;
 	};
