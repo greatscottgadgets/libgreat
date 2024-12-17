@@ -22,9 +22,9 @@ typedef enum {
 
 typedef enum {
 	NO_PARITY            = 0b000,
-	ODD_PARITY           = 0b100,
-	EVEN_PARITY          = 0b101,
-	PARITY_STUCK_AT_ONE  = 0b110,
+	ODD_PARITY           = 0b001,
+	EVEN_PARITY          = 0b011,
+	PARITY_STUCK_AT_ONE  = 0b101,
 	PARITY_STUCK_AT_ZERO = 0b111,
 } uart_parity_type_t;
 
