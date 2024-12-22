@@ -8,7 +8,6 @@ devices over USB.
 """
 
 from __future__ import absolute_import
-from future import utils as future_utils
 
 import usb
 import time
@@ -391,7 +390,7 @@ class USBCommsBackend(CommsBackend):
 
                 # If this was an error raised on the device side, covert it to a CommandFailureError.
                 if is_signaled_error and rephrase_errors:
-                    future_utils.raise_from(self._exception_for_command_failure(error_number, pretty_name), None)
+                    raise self._exception_for_command_failure(error_number, pretty_name) from None
                 else:
                     raise
         finally:
