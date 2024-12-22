@@ -163,8 +163,7 @@ class CommsBackend(object):
         class_docs = self.apis['core'].get_class_docs(class_number)
 
         # Ensure that the class name is a string type that can be a class name.
-        # This ensures python2 compatibility.
-        class_name = future_utils.native_str(class_name)
+        class_name = str(class_name)
 
         # If we already have an object for the given class,
         # and we're not in overwrite mode, skip enumerating it.
@@ -1127,7 +1126,7 @@ def command_rpc(verb_number, in_format="", out_format="", name="function", class
                 timeout=timeout, max_response_length=max_response_length, encoding=encoding, *arguments)
 
     # Apply our known documentation to the given command.
-    method.__name__ = future_utils.native_str(name)
+    method.__name__ = str(name)
     method.__doc__ = doc
 
     # Generate a method signature object, so the python documentation will be correct.
