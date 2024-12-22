@@ -28,7 +28,6 @@ classifiers = [
 
 dependencies = [
     "pyusb",
-    "future",
     "backports.functools_lru_cache",
 ]
 

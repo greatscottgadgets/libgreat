@@ -8,7 +8,6 @@ Module containing the core definitions for a libgreat-driven board.
 
 # FIXME: remove dependencies
 import usb
-import future
 import time
 
 # Use the GreatFET comms API, and the standard (core) API.
