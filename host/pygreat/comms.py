@@ -8,10 +8,8 @@ libgreat devices.
 """
 
 from __future__ import unicode_literals
-from future import utils as future_utils
 
 import re
-import sys
 import struct
 import inspect
 import collections
@@ -776,7 +774,7 @@ class CommsBackend(object):
             # Wrap any exceptions that occur with a more specific method.
             message = "invalid arguments in call to RPC `{}`; innner message: {}; format: {}".format(name, e, in_format)
             outer_exception = type(e)(message)
-            future_utils.raise_with_traceback(outer_exception, sys.exc_info()[2])
+            raise outer_exception.with_traceback(e.__traceback__) from None
 
         # If we're not reading a response (e.g. if the output format is empty, or None),
         # truncate the max_response_length to zero. This allows backends to skip waiting for a response, when they can.
@@ -803,7 +801,7 @@ class CommsBackend(object):
             # Wrap any exceptions that occur with a more specific method.
             message = "unexpected return RPC `{}`; innner message: {}; format: {}".format(name, e, out_format)
             outer_exception = type(e)(message)
-            future_utils.raise_with_traceback(outer_exception, sys.exc_info()[2])
+            raise outer_exception.with_traceback(e.__traceback__) from None
 
         # If we have an encoding, convert any byte arguments
         # into a string.
