@@ -8,10 +8,8 @@ libgreat devices.
 """
 
 from __future__ import unicode_literals
-from future import utils as future_utils
 
 import re
-import sys
 import struct
 import inspect
 import collections
@@ -163,8 +161,7 @@ class CommsBackend(object):
         class_docs = self.apis['core'].get_class_docs(class_number)
 
         # Ensure that the class name is a string type that can be a class name.
-        # This ensures python2 compatibility.
-        class_name = future_utils.native_str(class_name)
+        class_name = str(class_name)
 
         # If we already have an object for the given class,
         # and we're not in overwrite mode, skip enumerating it.
@@ -777,7 +774,7 @@ class CommsBackend(object):
             # Wrap any exceptions that occur with a more specific method.
             message = "invalid arguments in call to RPC `{}`; innner message: {}; format: {}".format(name, e, in_format)
             outer_exception = type(e)(message)
-            future_utils.raise_with_traceback(outer_exception, sys.exc_info()[2])
+            raise outer_exception.with_traceback(e.__traceback__) from None
 
         # If we're not reading a response (e.g. if the output format is empty, or None),
         # truncate the max_response_length to zero. This allows backends to skip waiting for a response, when they can.
@@ -804,7 +801,7 @@ class CommsBackend(object):
             # Wrap any exceptions that occur with a more specific method.
             message = "unexpected return RPC `{}`; innner message: {}; format: {}".format(name, e, out_format)
             outer_exception = type(e)(message)
-            future_utils.raise_with_traceback(outer_exception, sys.exc_info()[2])
+            raise outer_exception.with_traceback(e.__traceback__) from None
 
         # If we have an encoding, convert any byte arguments
         # into a string.
@@ -1127,7 +1124,7 @@ def command_rpc(verb_number, in_format="", out_format="", name="function", class
                 timeout=timeout, max_response_length=max_response_length, encoding=encoding, *arguments)
 
     # Apply our known documentation to the given command.
-    method.__name__ = future_utils.native_str(name)
+    method.__name__ = str(name)
     method.__doc__ = doc
 
     # Generate a method signature object, so the python documentation will be correct.
