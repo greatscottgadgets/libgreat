@@ -384,8 +384,9 @@ class USB1CommsBackend(CommsBackend):
             else:
                 to_send = prelude
 
-            # If our max response is zero, never bother reading a response.
-            skip_reading_response = (max_response_length == 0)
+            # If our verb signature has no return value(s), make sure we will still check for an error return.
+            if max_response_length == 0:
+                max_response_length = 4
 
             # To save on the overall number of command transactions, the backend provides an optimization
             # that allows us to skip the "send" phase if the class, verb, and data are the same as the immediately
@@ -396,17 +397,9 @@ class USB1CommsBackend(CommsBackend):
             try:
                 # If we're not using the repeat-optimization, send the in-arguments to the device.
                 if not use_repeat_optimization:
-
-                    # Set the FLAG_SKIP_RESPONSE flag if we don't expect a response back from the device.
-                    flags = self.LIBGREAT_FLAG_SKIP_RESPONSE if skip_reading_response else 0
-
+                    flags = 0
                     self.device_handle.controlWrite(usb1.TYPE_VENDOR | usb1.RECIPIENT_DEVICE,
                         self.LIBGREAT_REQUEST_NUMBER, self.LIBGREAT_VALUE_EXECUTE, flags, to_send, timeout)
-
-                    # If we're skipping reading a response, return immediately.
-                    if skip_reading_response:
-                        return None
-
 
                 # Set the FLAG_REPEAT_LAST if we're using our repeat-last optimization.
                 flags = self.LIBGREAT_FLAG_REPEAT_LAST if use_repeat_optimization else 0
@@ -436,7 +429,7 @@ class USB1CommsBackend(CommsBackend):
                 # and we should convert this into a failed command error.
                 is_signaled_error = isinstance(e, usb1.USBErrorPipe)
 
-                # If this was an error raised on the device side, covert it to a CommandFailureError.
+                # If this was an error raised on the device side, convert it to a CommandFailureError.
                 if is_signaled_error and rephrase_errors:
                     future_utils.raise_from(self._exception_for_command_failure(error_number, pretty_name), None)
                 else:
