@@ -479,7 +479,7 @@ class USB1CommsBackend(CommsBackend):
         USB_ERROR_NO_SUCH_DEVICE = 19
 
         try:
-            self.device_handle.clearHalt()
+            self.device_handle.clearHalt(0)
             return True
         except usb1.USBErrorNotFound:
             return True
