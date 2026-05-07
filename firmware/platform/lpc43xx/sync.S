@@ -9,6 +9,7 @@
 .equ unlocked,0
 
 .global _lock_mutex
+.type _lock_mutex, %function
 _lock_mutex:
     LDR     r1, =locked
 1:  LDREX   r2, [r0]
@@ -26,6 +27,7 @@ _lock_mutex:
 
 
 .global _unlock_mutex
+.type _unlock_mutex, %function
 _unlock_mutex:
     LDR     r1, =unlocked
     DMB                   // Required before releasing protected resource
