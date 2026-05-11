@@ -7,8 +7,6 @@ Module containing the general definitions for communicating with
 libgreat devices.
 """
 
-from __future__ import unicode_literals
-
 import re
 import struct
 import inspect
@@ -16,15 +14,7 @@ import collections
 
 from . import errors
 
-try:
-    from functools import lru_cache as memoize_with_lru_cache
-except ImportError:
-    try:
-        from backports.functools_lru_cache import lru_cache as memoize_with_lru_cache
-    except ImportError:
-        # If we couldn't import functools_lru_cache, then ignore it and define a null-dcorator.
-        memoize_with_lru_cache = lambda maxsize=128, typed=False : (lambda f : f)
-
+from functools import lru_cache as memoize_with_lru_cache
 
 
 class CommsError(IOError):

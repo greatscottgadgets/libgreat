@@ -7,8 +7,6 @@ Module containing the definitions necessary to communicate with libgreat
 devices over USB.
 """
 
-from __future__ import absolute_import
-
 import usb
 import time
 import errno

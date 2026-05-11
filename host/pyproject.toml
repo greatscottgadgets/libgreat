@@ -28,7 +28,6 @@ classifiers = [
 
 dependencies = [
     "pyusb",
-    "backports.functools_lru_cache",
 ]
 
 dynamic = ["version"]
