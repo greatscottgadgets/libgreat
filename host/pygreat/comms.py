@@ -7,8 +7,6 @@ Module containing the general definitions for communicating with
 libgreat devices.
 """
 
-from __future__ import unicode_literals
-
 import re
 import struct
 import inspect
