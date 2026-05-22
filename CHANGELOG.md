@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 -->
 
+## [v2026.0.0] - 2026-05-22
+### Fixed
+* Firmware builds fail with GCC 15.2
+### Changed
+* Removed remaining imports from Python 2 -> 3 migration.
+
 ## [v2024.0.5] - 2025-06-03
 ### Fixed
 * The `usb1` backend can now check for an error return when a verb signature has no return value(s)
